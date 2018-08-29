@@ -10,7 +10,7 @@ def save_train_feature_vectors(train_data, label, network):
     f = open("train_feature_vectors.txt", "a")
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
-        string = str(x) + '\t' + str(y)
+        string = str(x) + '\t' + str(y) + '\t' + label
         for elem in feature:
             string += '\t' + str(elem)
         f.write(string + '\n')
@@ -186,7 +186,7 @@ def main():
     neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), network=sparse_matrix)
 
     print(neg_links)
-    # save_train_feature_vectors(train, label=1, network=sparse_matrix)
+    save_train_feature_vectors(train, label=1, network=sparse_matrix)
     save_train_feature_vectors(neg_links, label=0, network=sparse_matrix)
 
     print("Training...")
