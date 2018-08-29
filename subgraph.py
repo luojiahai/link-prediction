@@ -13,13 +13,22 @@ def list_union(list1, list2):
     return output
 
 def neighbors(fringe, network):
+    output = []
     for i in range(len(fringe)):
         ind = fringe[i]
         x = ind[0]
         y = ind[1]
-        x_row = network.getrow(x).nonzero()[1]
-        y_col = network.getcol(y).nonzero()[0]
-    return None
+        xy = network.getrow(x).nonzero()[1]
+        yx = network.getcol(y).nonzero()[0]
+        for elem in xy:
+            edge = [x, elem]
+            if edge not in output:
+                output.append(edge)
+        for elem in yx:
+            edge = [elem, y]
+            if edge not in output:
+                output.append(edge)
+    return output
 
 def enclosing_subgraph_extraction(link, network, h):
     (x, y) = link
@@ -29,7 +38,7 @@ def enclosing_subgraph_extraction(link, network, h):
             break
         fringe = neighbors(fringe, network)
         fringe = list_complement(fringe, links)
-        links = union(links, fringe)
+        links = list_union(links, fringe)
     sample = np.array(links)
     return sample
 
@@ -74,10 +83,9 @@ def load_data(path, delimiter):
 
 def main():
     (adjlist, sparse_matrix) = load_data("data/Celegans.txt", delimiter=' ')
-    print(sparse_matrix)
-    # enclosing_subgraph_extraction((284, 277), sparse_matrix, 1)
-    a = sparse_matrix.getcol(3).nonzero()[0]
-    print(a)
+    # print(sparse_matrix)
+    sample = enclosing_subgraph_extraction((284, 277), sparse_matrix, 2)
+    print(sample)
 
 if __name__ == "__main__":
     main()
