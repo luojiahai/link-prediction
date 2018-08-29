@@ -238,7 +238,7 @@ def main():
             processed = progress_sum - last_measume
             pts = processed/elapsed
             eta = total_sum/pts/60/60
-            print(f"Stats: {pts:.00}/s, ETA:{eta:.00}h", end=".")
+            print(f"Stats: {pts:.2f}/s, ETA:{eta:.2f}h", end=".")
 
         print("")
         time_last_measure = time.time()
