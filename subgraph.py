@@ -4,17 +4,42 @@ from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
 
-def train_svm(train_pos, train_neg, network):
+
+def save_train_feature_vectors(train_data, network):
+    f = open("train_feature_vectors.txt", "a")
+    for (x, y) in train_data:
+        feature = feature_extraction((x, y), network)
+        string = str(x) + '\t' + str(y)
+        for elem in feature:
+            string += '\t' + str(elem)
+        f.write(string + '\n')
+        print("Writing " + string)
+    return None
+    
+def train_svm(train_pos, network):
     model = SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
                 decision_function_shape='ovr', degree=3, gamma='auto', kernel='rbf',
                 max_iter=-1, probability=False, random_state=None, shrinking=True,
                 tol=0.001, verbose=False)
     X_pos = []
-    X_neg = []
+    y_pos = []
+    with open("train_feature_vectors.txt", "r") as f:
+        for line in f:
+            splited = line.rstrip().split('\t')
+            x = int(splited[0])
+            y = int(splited[1])
+            feature = []
+            for i in range(2, len(splited)):
+                feature.append(splited[i])
+            X_pos.append(feature)
+            y_pos.append(1)
+    return model
 
-    return None
-
-def test_svm(test_data, network):
+def test_svm(model, test_data, network):
+    for link in test_data:
+        feature = feature_extraction(link, network)
+        score = model.score(feature, [1])
+        print(str(link) + ": " + str(score))
     return None
 
 def feature_extraction(link, network):
@@ -30,16 +55,16 @@ def feature_extraction(link, network):
     common_neighbors = len(list(nx.common_neighbors(subgraph.to_undirected(), x, y)))
     feature.append(common_neighbors)
     # jaccard coefficient
-    (_, _, jaccard_coefficient) = nx.jaccard_coefficient(subgraph.to_undirected(), [(x, y)])
+    (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(subgraph.to_undirected(), [(x, y)]))[0]
     feature.append(jaccard_coefficient)
     # preferential attachment
-    (_, _, preferential_attachment) = nx.preferential_attachment(subgraph.to_undirected(), [(x, y)])
+    (_, _, preferential_attachment) = list(nx.preferential_attachment(subgraph.to_undirected(), [(x, y)]))[0]
     feature.append(preferential_attachment)
     # adamic adar index
-    (_, _, adamic_adar_index) = nx.adamic_adar_index(subgraph.to_undirected(), [(x, y)])
+    (_, _, adamic_adar_index) = list(nx.adamic_adar_index(subgraph.to_undirected(), [(x, y)]))[0]
     feature.append(adamic_adar_index)
     # resource allocation index
-    (_, _, resource_allocation_index) = nx.resource_allocation_index(subgraph.to_undirected(), [(x, y)])
+    (_, _, resource_allocation_index) = list(nx.resource_allocation_index(subgraph.to_undirected(), [(x, y)]))[0]
     feature.append(resource_allocation_index)
     
     return feature
@@ -98,7 +123,7 @@ def load_test_data(path, delimiter):
                 v1 = splited[0]
                 v2 = splited[i]
                 # construct (x, y) tuple
-                test.append((v1, v2))
+                test.append((int(v1), int(v2)))
     return test
 
 def load_train_data(path, delimiter):
@@ -126,7 +151,7 @@ def load_train_data(path, delimiter):
                 row_array.append(v1)
                 col_array.append(v2)
                 # construct (x, y) tuple
-                train.append((v1, v2))
+                train.append((int(v1), int(v2)))
     
     # total number of distinct nodes
     n = len(adjlist.keys())
@@ -145,10 +170,10 @@ def main():
     test = load_test_data("data/Celegans_test.txt", delimiter=' ')
     negative_links = sample_negative_links(size=len(train))
 
-    print(feature_extraction((0,6), sparse_matrix))
+    save_train_feature_vectors(train, network=sparse_matrix)
 
-    
-
+    model = train_svm(train, network=sparse_matrix)
+    test_svm(model, test, network=sparse_matrix)
 
 if __name__ == "__main__":
     main()
