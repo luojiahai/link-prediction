@@ -46,7 +46,7 @@ def test_svm(model, test_data, test_dict, network):
         feature = feature_extraction((x, y), network)
         results = model.predict_proba([feature])[0]
         prob_per_class_dictionary = dict(zip(model.classes_, results))
-        #string = str(i) + ',' + str(prob_per_class_dictionary['1'])
+        #string = str(i) + ',' + str(prob_per_class_dictionary[1])
         print(str((x, y)) + ": " + str(prob_per_class_dictionary))
     return None
 
@@ -117,33 +117,39 @@ def enclosing_subgraph_extraction(link, network, h):
     sample = np.array(links)
     return sample
 
-def sample_negative_links(n, size, train_data):
+def sample_negative_links(n, size, adjlist):
     neg_links = []
     i = 0
     while i < size:
         x = random.randrange(n)
         y = random.randrange(n)
-        if ((x, y) not in train_data):
+        if (y not in adjlist[x]):
             neg_links.append((x, y))
             i = i + 1
         else:
             i = i - 1
     return neg_links
 
-def load_test_data(path, delimiter):
+def load_test_data(path, delimiter, with_index):
     test = []
     test_dict = {}
     with open(path, "r") as f:
         for line in f:
             # split the line
             splited = line.rstrip().split(delimiter)
-            v0 = int(splited[0])
-            v1 = int(splited[1])
-            v2 = int(splited[2])
-            # construct dictionary
-            test_dict[v0] = (v1, v2)
-            # construct (x, y) tuple
-            test.append((v1, v2))
+            if (with_index):
+                v0 = int(splited[0])
+                v1 = int(splited[1])
+                v2 = int(splited[2])
+                # construct dictionary
+                test_dict[v0] = (v1, v2)
+                # construct (x, y) tuple
+                test.append((v1, v2))
+            else:
+                v1 = int(splited[0])
+                v2 = int(splited[1])
+                # construct (x, y) tuple
+                test.append((v1, v2))
     return (test, test_dict)
 
 def load_train_data(path, delimiter):
@@ -187,15 +193,15 @@ def load_train_data(path, delimiter):
 
 def main():
     print("Loading train data...")
-    (train, adjlist, sparse_matrix) = load_train_data("data/train.txt", delimiter='\t')
+    (train, adjlist, sparse_matrix) = load_train_data("data/Celegans.txt", delimiter=' ')
 
     print("Loading test data...")
-    (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t')
+    (test, test_dict) = load_test_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), train_data=train)
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
 
-    feature_vector_path = "twitter_train_feature_vectors.txt"
+    feature_vector_path = "train_feature_vectors.txt"
 
     print("Saving positive train data...")
     save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
