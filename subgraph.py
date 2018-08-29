@@ -4,6 +4,9 @@ from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
 import random
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Process, Manager
+import time
 
 
 def save_train_feature_vectors(path, train_data, label, network):
@@ -117,17 +120,22 @@ def enclosing_subgraph_extraction(link, network, h):
     sample = np.array(links)
     return sample
 
-def sample_negative_links(n, size, train_data):
+def sample_negative_links(result_buffer, index, proress_buffer, n, starti, endi, train_data):
+    # print(f'Process {index} started, with parametter n:{n}, starti:{starti}, endi:{endi}')
     neg_links = []
-    i = 0
-    while i < size:
+    currenti = starti
+    while currenti < endi:
+        # print(f'Thread {index}: {currenti}/{endi}')
         x = random.randrange(n)
         y = random.randrange(n)
+        # print(f'Ramdpm!')
         if ((x, y) not in train_data):
             neg_links.append((x, y))
-            i = i + 1
-        else:
-            i = i - 1
+            currenti = currenti + 1
+        proress_buffer[index] = (starti,currenti,endi)
+    result_buffer[index] = neg_links
+    # print(f'Process {index} finished, with parametter index:{index}, starti:{starti}, endi:{endi}')
+    
     return neg_links
 
 def load_test_data(path, delimiter):
@@ -193,9 +201,53 @@ def main():
     (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t')
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), train_data=train)
+    multi_thread = 7
+    manager = Manager()
+    # initialise buffer
+    progress_buffer = manager.list([None] * multi_thread)
+    result_buffer = manager.list([[None]] * multi_thread)
+    # Divide task and call process
+    for x in range(multi_thread):
+        starti = 0 if x == 0 else int(len(train)/multi_thread) * x + 1
+        endi = int(len(train)/multi_thread) * (x + 1) if x < (multi_thread - 1) else len(train)
+        progress_buffer[x] = (starti,endi)
+        p = Process(target=sample_negative_links,args=(result_buffer,x,progress_buffer, len(adjlist.keys()), starti, endi, train))
+        p.start()
+    print("Monitoring progress")
+    print("")
+    time_last_measure = None
+    last_measume = 0
+    # initiate monitoring and ETA tasks
+    while([None] in result_buffer):
+        # print(result_buffer)
+        i = 0
+        progress_sum = 0
+        total_sum = 0
+        for start,current,end in [e for e in progress_buffer if len(e) == 3]:
+            progress_i = current-start
+            total_i = end-start
+            print(f'Thread {i}: {progress_i}/{total_i}', end=". ")
+            i = i + 1
+            progress_sum = progress_sum + progress_i
+            total_sum = total_sum + total_i
+        total_sum = total_sum if total_sum > 0 else 1
 
+        print(f"Summary: {progress_sum}/{total_sum}, {progress_sum/total_sum:.00%}", end = ". ")
+        if(time_last_measure != None):
+            elapsed = time.time() - time_last_measure
+            processed = progress_sum - last_measume
+            pts = processed/elapsed
+            eta = total_sum/pts/60/60
+            print(f"Stats: {pts:.00}/s, ETA:{eta:.00}h", end=".")
+
+        print("")
+        time_last_measure = time.time()
+        last_measume = progress_sum
+        time.sleep(5)
+ 
+    neg_links = [element for sublist in result_buffer for element in sublist]
     feature_vector_path = "twitter_train_feature_vectors.txt"
+
 
     print("Saving positive train data...")
     save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
@@ -211,4 +263,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-                 
