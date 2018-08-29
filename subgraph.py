@@ -125,6 +125,7 @@ def sample_negative_links(n, size, network):
         y = random.randrange(n)
         if (network.getrow(x).getcol(y).data == []):
             neg_links.append((x, y))
+            i = i + 1
         else:
             i = i - 1
     return neg_links
