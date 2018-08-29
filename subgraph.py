@@ -26,8 +26,8 @@ def train_svm(train_pos, network):
     with open("train_feature_vectors.txt", "r") as f:
         for line in f:
             splited = line.rstrip().split('\t')
-            x = int(splited[0])
-            y = int(splited[1])
+            # x = int(splited[0])
+            # y = int(splited[1])
             feature = []
             for i in range(2, len(splited)):
                 feature.append(splited[i])
