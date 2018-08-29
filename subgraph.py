@@ -2,11 +2,11 @@ import math
 from scipy import sparse
 import numpy as np
 
+def list_complement(list1, list2):
+    return [elem for elem in list1 if elem not in list2]
+
 def list_union(list1, list2):
-    output = []
-    for elem in list1:
-        if elem not in output:
-            output.append(elem)
+    output = list1
     for elem in list2:
         if elem not in output:
             output.append(elem)
@@ -28,6 +28,7 @@ def enclosing_subgraph_extraction(link, network, h):
         if len(fringe) == 0:
             break
         fringe = neighbors(fringe, network)
+        fringe = list_complement(fringe, links)
         links = union(links, fringe)
     sample = np.array(links)
     return sample
