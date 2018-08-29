@@ -117,13 +117,13 @@ def enclosing_subgraph_extraction(link, network, h):
     sample = np.array(links)
     return sample
 
-def sample_negative_links(n, size, network):
+def sample_negative_links(n, size, train_data):
     neg_links = []
     i = 0
     while i < size:
         x = random.randrange(n)
         y = random.randrange(n)
-        if (list(network.getrow(x).getcol(y).data) == []):
+        if ((x, y) not in train_data):
             neg_links.append((x, y))
             i = i + 1
         else:
@@ -193,7 +193,7 @@ def main():
     (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t')
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), network=sparse_matrix)
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), train_data=train)
 
     feature_vector_path = "twitter_train_feature_vectors.txt"
 
