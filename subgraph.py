@@ -7,14 +7,19 @@ import random
 
 
 def save_train_feature_vectors(train_data, label, network):
+    i = 0
     f = open("train_feature_vectors.txt", "a")
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
-        string = str(x) + '\t' + str(y) + '\t' + label
+        string = str(x) + '\t' + str(y) + '\t' + str(label)
         for elem in feature:
             string += '\t' + str(elem)
         f.write(string + '\n')
         print("Writing " + string)
+        if (i == 100):
+            break
+        else:
+            i += 1
     return None
     
 def train_svm(train_pos, train_neg, network):
@@ -118,10 +123,10 @@ def sample_negative_links(n, size, network):
     while i < size:
         x = random.randrange(n)
         y = random.randrange(n)
-        if (network.getrow(x).getcol(y).data[0] == 1):
-            i = i - 1
-        else:
+        if (network.getrow(x).getcol(y).data == []):
             neg_links.append((x, y))
+        else:
+            i = i - 1
     return neg_links
 
 def load_test_data(path, delimiter):
