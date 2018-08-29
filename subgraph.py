@@ -6,7 +6,7 @@ from sklearn.svm import SVC
 import random
 
 
-def save_train_feature_vectors(train_data, network):
+def save_train_feature_vectors(train_data, label, network):
     f = open("train_feature_vectors.txt", "a")
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
@@ -17,13 +17,13 @@ def save_train_feature_vectors(train_data, network):
         print("Writing " + string)
     return None
     
-def train_svm(train_pos, network):
+def train_svm(train_pos, train_neg, network):
     model = SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
                 decision_function_shape='ovr', degree=3, gamma='auto', kernel='rbf',
                 max_iter=-1, probability=False, random_state=None, shrinking=True,
                 tol=0.001, verbose=False)
-    X_pos = []
-    y_pos = []
+    X = []
+    y = []
     with open("train_feature_vectors.txt", "r") as f:
         for line in f:
             splited = line.rstrip().split('\t')
@@ -32,9 +32,10 @@ def train_svm(train_pos, network):
             feature = []
             for i in range(2, len(splited)):
                 feature.append(splited[i])
-            X_pos.append(feature)
-            y_pos.append(1)
-    model.fit(X_pos, y_pos)
+            X.append(feature)
+            y.append(1)
+    
+    model.fit(X, y)
     return model
 
 def test_svm(model, test_data, network):
@@ -185,7 +186,8 @@ def main():
     neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), network=sparse_matrix)
 
     print(neg_links)
-    # save_train_feature_vectors(train, network=sparse_matrix)
+    # save_train_feature_vectors(train, label=1, network=sparse_matrix)
+    save_train_feature_vectors(neg_links, label=0, network=sparse_matrix)
 
     print("Training...")
     model = train_svm(train, network=sparse_matrix)
