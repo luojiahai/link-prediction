@@ -3,6 +3,7 @@ import networkx as nx
 from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
+import random
 
 
 def save_train_feature_vectors(train_data, network):
@@ -110,8 +111,17 @@ def enclosing_subgraph_extraction(link, network, h):
     sample = np.array(links)
     return sample
 
-def sample_negative_links(size):
-    return None
+def sample_negative_links(n, size, network):
+    neg_links = []
+    i = 0
+    while i < size:
+        x = random.randrange(n)
+        y = random.randrange(n)
+        if (network.getrow(x).getcol(y).data[0] == 1):
+            i = i - 1
+        else:
+            neg_links.append((x, y))
+    return neg_links
 
 def load_test_data(path, delimiter):
     test = []
@@ -167,13 +177,19 @@ def load_train_data(path, delimiter):
     return (train, adjlist, sparse_matrix)
 
 def main():
+    print("Loading train data...")
     (train, adjlist, sparse_matrix) = load_train_data("data/Celegans.txt", delimiter=' ')
+    print("Loading test data...")
     test = load_test_data("data/Celegans_test.txt", delimiter=' ')
-    negative_links = sample_negative_links(size=len(train))
+    print("Sampling negative links...")
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), network=sparse_matrix)
 
+    print(neg_links)
     # save_train_feature_vectors(train, network=sparse_matrix)
 
+    print("Training...")
     model = train_svm(train, network=sparse_matrix)
+    print("Testing...")
     test_svm(model, test, network=sparse_matrix)
 
 if __name__ == "__main__":
