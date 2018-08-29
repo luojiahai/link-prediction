@@ -14,6 +14,7 @@ def save_train_feature_vectors(path, train_data, label, network):
         for elem in feature:
             string += '\t' + str(elem)
         f.write(string + '\n')
+        print("Writing " + str((x, y)) + ' ' + str(label))
     return None
     
 def train_svm(path, network):
@@ -203,11 +204,11 @@ def main():
 
     feature_vector_path = "train_feature_vectors.txt"
 
-    print("Saving positive train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
+    #print("Saving positive train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
 
-    print("Saving negative train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=sparse_matrix)
+    #print("Saving negative train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=sparse_matrix)
 
     print("Training...")
     model = train_svm(feature_vector_path, network=sparse_matrix)
