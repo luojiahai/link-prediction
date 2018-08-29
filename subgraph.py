@@ -33,6 +33,7 @@ def train_svm(train_pos, network):
                 feature.append(splited[i])
             X_pos.append(feature)
             y_pos.append(1)
+    model.fit(X_pos, y_pos)
     return model
 
 def test_svm(model, test_data, network):
@@ -120,10 +121,10 @@ def load_test_data(path, delimiter):
             splited = line.rstrip().split(delimiter)
             for i in range(1, len(splited)):
                 # two connected vertices
-                v1 = splited[0]
-                v2 = splited[i]
+                v1 = int(splited[0])
+                v2 = int(splited[i])
                 # construct (x, y) tuple
-                test.append((int(v1), int(v2)))
+                test.append((v1, v2))
     return test
 
 def load_train_data(path, delimiter):
@@ -138,8 +139,8 @@ def load_train_data(path, delimiter):
             splited = line.rstrip().split(delimiter)
             for i in range(1, len(splited)):
                 # two connected vertices
-                v1 = splited[0]
-                v2 = splited[i]
+                v1 = int(splited[0])
+                v2 = int(splited[i])
                 # construct adjacency list
                 if v1 not in adjlist.keys():
                     adjlist[v1] = [v2]
@@ -151,7 +152,7 @@ def load_train_data(path, delimiter):
                 row_array.append(v1)
                 col_array.append(v2)
                 # construct (x, y) tuple
-                train.append((int(v1), int(v2)))
+                train.append((v1, v2))
     
     # total number of distinct nodes
     n = len(adjlist.keys())
@@ -170,7 +171,7 @@ def main():
     test = load_test_data("data/Celegans_test.txt", delimiter=' ')
     negative_links = sample_negative_links(size=len(train))
 
-    save_train_feature_vectors(train, network=sparse_matrix)
+    # save_train_feature_vectors(train, network=sparse_matrix)
 
     model = train_svm(train, network=sparse_matrix)
     test_svm(model, test, network=sparse_matrix)
