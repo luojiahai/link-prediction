@@ -68,8 +68,8 @@ def train_svm(path, network):
 def test_svm(model, test_data, test_dict, network):
     testset = []
     with open("test_output.csv", "a") as f:
-        bar = progressbar.ProgressBar(max_value=len(test_data))
-        f.write("Id,Prediction")
+        bar = progressbar.ProgressBar(max_value=len(test_data)+1)
+        f.write("Id,Prediction\n")
         i = 1
         for (x, y) in test_data:
             feature = feature_extraction((x, y), network)
@@ -186,7 +186,7 @@ def sample_negative_links(n, size, adjlist):
     return neg_links
 
 def load_test_data(path, delimiter, with_index):
-    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+    bar = progressbar.ProgressBar(max_value=20000)
     pb_i = 0
     test = []
     test_dict = {}
@@ -207,9 +207,9 @@ def load_test_data(path, delimiter, with_index):
                 v2 = int(splited[1])
                 # construct (x, y) tuple
                 test.append((v1, v2))
-            # progress bar update
-            pb_i = pb_i + 1
-            bar.update(pb_i)
+        # progress bar update
+        pb_i = pb_i + 1
+        bar.update(pb_i)
     return (test, test_dict)
 
 def load_train_data(path, delimiter):
@@ -219,8 +219,10 @@ def load_train_data(path, delimiter):
     adjlist = {}    # adjacency list
     row_array = []  # row indices
     col_array = []  # col indices
+    counter = 0
     with open(path, "r") as f:
         for line in f:
+            counter = counter + 1
             # split the line
             splited = line.rstrip().split(delimiter)
             for i in range(1, len(splited)):
@@ -242,6 +244,7 @@ def load_train_data(path, delimiter):
                 # progress bar update
                 pb_i = pb_i + 1
                 bar.update(i)
+    print(f"Counter: {counter}")
     # total number of distinct nodes
     n = len(adjlist.keys())
     # row indices

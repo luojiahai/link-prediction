@@ -174,7 +174,8 @@ def load_train_data(path, delimiter):
     train = []
     adjlist = {}    # adjacency list
     network = nx.Graph()
-
+    bar = progressbar.ProgressBar(max_value=20000)
+    pb_i = 0
     with open(path, "r") as f:
         for line in f:
             # split the line
@@ -194,6 +195,8 @@ def load_train_data(path, delimiter):
                 network.add_edge(v1, v2)
                 # construct (x, y) tuple
                 train.append((v1, v2))
+            pb_i = pb_i + 1
+            bar.update(pb_i)
     
     return (train, adjlist, network)
 
