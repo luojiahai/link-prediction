@@ -23,6 +23,7 @@ def save_train_feature_vectors(path, train_data, label, network):
         if (i == len(train_data)):
             time.sleep(0.1)
         bar.update(i)
+    print('\n')
     return None
     
 def train_svm(path, network):
@@ -48,15 +49,20 @@ def train_svm(path, network):
 
 def test_svm(model, test_data, test_dict, network):
     testset = []
-    #f = open("output.csv", "a")
-    #f.write("Id,Prediction")
-    #i = 1
-    for (x, y) in test_data:
-        feature = feature_extraction((x, y), network)
-        results = model.predict_proba([feature])[0]
-        prob_per_class_dictionary = dict(zip(model.classes_, results))
-        #string = str(i) + ',' + str(prob_per_class_dictionary[1])
-        print(str((x, y)) + ": " + str(prob_per_class_dictionary))
+    with open("test_output.csv", "a") as f:
+        bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+        f.write("Id,Prediction")
+        i = 1
+        for (x, y) in test_data:
+            feature = feature_extraction((x, y), network)
+            results = model.predict_proba([feature])[0]
+            prob_per_class_dictionary = dict(zip(model.classes_, results))
+            string = str(i) + ',' + str(prob_per_class_dictionary[1])
+            f.write(string)
+            # progress bar update
+            i = i + 1
+            bar.update(i)
+        print('\n')
     return None
 
 def feature_extraction(link, network):
@@ -142,6 +148,7 @@ def sample_negative_links(n, size, adjlist):
             bar.update(i)
         else:
             i = i - 1
+    print('\n')
     return neg_links
 
 def load_test_data(path, delimiter, with_index):
