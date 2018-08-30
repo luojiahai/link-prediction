@@ -9,8 +9,8 @@ import progressbar
 from random import shuffle
 
 def save_train_feature_vectors(path, train_data, label, network):
-    limitor = 2000
-    bar = progressbar.ProgressBar(max_value = 2000)
+    limitor = 20000
+    bar = progressbar.ProgressBar(max_value = limitor+1)
     f = open(path, "a")
     i = 0
     shuffle(train_data) 
@@ -25,8 +25,8 @@ def save_train_feature_vectors(path, train_data, label, network):
         if (i == len(train_data)):
             time.sleep(0.1)
         bar.update(i)
-        if (i == 2000):
-            break
+        # if (i == 2000):
+        #     break
     print('\n')
     return None
     
@@ -76,18 +76,18 @@ def feature_extraction(link, network):
     # common neighbors
     common_neighbors = len(list(nx.common_neighbors(network, x, y)))
     feature.append(common_neighbors)
-    # jaccard coefficient
-    (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
-    feature.append(jaccard_coefficient)
-    # preferential attachment
-    (_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
-    feature.append(preferential_attachment)
-    # adamic adar index
+    # # jaccard coefficient
+    # (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
+    # feature.append(jaccard_coefficient)
+    # # preferential attachment
+    # (_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
+    # feature.append(preferential_attachment)
+    # # adamic adar index
     (_, _, adamic_adar_index) = list(nx.adamic_adar_index(network, [(x, y)]))[0]
     feature.append(adamic_adar_index)
-    # resource allocation index
-    (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
-    feature.append(resource_allocation_index)
+    # # resource allocation index
+    # (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
+    # feature.append(resource_allocation_index)
     
     return feature
 
