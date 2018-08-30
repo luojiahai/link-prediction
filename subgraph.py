@@ -201,7 +201,7 @@ def main():
     (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t')
 
     print("Sampling negative links...")
-    multi_thread = 7
+    multi_thread = 8
     manager = Manager()
     # initialise buffer
     progress_buffer = manager.list([None] * multi_thread)
