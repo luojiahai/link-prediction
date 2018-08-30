@@ -9,10 +9,28 @@ import progressbar
 
 
 def save_train_feature_vectors(path, train_data, label, network):
-    bar = progressbar.ProgressBar(max_value=len(train_data))
+    #bar = progressbar.ProgressBar(max_value=len(train_data))
     f = open(path, "a")
-    i = 0
-    for (x, y) in train_data:
+    #i = 0
+    #for (x, y) in train_data:
+    #    feature = feature_extraction((x, y), network)
+    #    string = str(x) + '\t' + str(y) + '\t' + str(label)
+    #    for elem in feature:
+    #        string += '\t' + str(elem)
+    #    f.write(string + '\n')
+    #    # progress bar update
+    #    i = i + 1
+    #    if (i == len(train_data)):
+    #        time.sleep(0.1)
+    #    bar.update(i)
+    randed = []
+    bar = progressbar.ProgressBar(max_value=10)
+    for i in range(10):
+        rand = random.randrange(len(train_data))
+        while rand in randed:
+            rand = random.randrange(len(train_data))
+        randed.append(rand)
+        (x, y) = train_data[rand]
         feature = feature_extraction((x, y), network)
         string = str(x) + '\t' + str(y) + '\t' + str(label)
         for elem in feature:
@@ -20,7 +38,7 @@ def save_train_feature_vectors(path, train_data, label, network):
         f.write(string + '\n')
         # progress bar update
         i = i + 1
-        if (i == len(train_data)):
+        if (i == 10):
             time.sleep(0.1)
         bar.update(i)
     print('\n')
@@ -50,7 +68,7 @@ def train_svm(path, network):
 def test_svm(model, test_data, test_dict, network):
     testset = []
     with open("test_output.csv", "a") as f:
-        bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+        bar = progressbar.ProgressBar(max_value=len(test_data))
         f.write("Id,Prediction")
         i = 1
         for (x, y) in test_data:
@@ -58,7 +76,7 @@ def test_svm(model, test_data, test_dict, network):
             results = model.predict_proba([feature])[0]
             prob_per_class_dictionary = dict(zip(model.classes_, results))
             string = str(i) + ',' + str(prob_per_class_dictionary[1])
-            f.write(string)
+            f.write(string + '\n')
             # progress bar update
             i = i + 1
             bar.update(i)
@@ -69,7 +87,7 @@ def feature_extraction(link, network):
     feature = []
     (x, y) = link
 
-    sample = enclosing_subgraph_extraction((x, y), network, 2)
+    sample = enclosing_subgraph_extraction((x, y), network, 1)
     subgraph = nx.DiGraph()
     for elem in sample:
         subgraph.add_edge(elem[0], elem[1])
@@ -100,6 +118,22 @@ def list_union(list1, list2):
     for elem in list2:
         if elem not in output:
             output.append(elem)
+    return output
+
+def get_elems(target, row_col, network):
+    inds = []
+    i = 0
+    for e in network.nonzero()[row_col]:
+        if (e == target):
+            inds.append(i)
+        i = i + 1
+    row_col_ = 1
+    if (row_col):
+        row_col_ = 0
+    output = []
+    for ind in inds:
+        arr = network.nonzero()[row_col_]
+        output.append(arr[ind])
     return output
 
 def neighbors(fringe, network):
@@ -152,6 +186,8 @@ def sample_negative_links(n, size, adjlist):
     return neg_links
 
 def load_test_data(path, delimiter, with_index):
+    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+    pb_i = 0
     test = []
     test_dict = {}
     with open(path, "r") as f:
@@ -171,14 +207,18 @@ def load_test_data(path, delimiter, with_index):
                 v2 = int(splited[1])
                 # construct (x, y) tuple
                 test.append((v1, v2))
+            # progress bar update
+            pb_i = pb_i + 1
+            bar.update(pb_i)
     return (test, test_dict)
 
 def load_train_data(path, delimiter):
+    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+    pb_i = 0
     train = []
     adjlist = {}    # adjacency list
     row_array = []  # row indices
     col_array = []  # col indices
-
     with open(path, "r") as f:
         for line in f:
             # split the line
@@ -199,7 +239,9 @@ def load_train_data(path, delimiter):
                 col_array.append(v2)
                 # construct (x, y) tuple
                 train.append((v1, v2))
-    
+                # progress bar update
+                pb_i = pb_i + 1
+                bar.update(i)
     # total number of distinct nodes
     n = len(adjlist.keys())
     # row indices
@@ -214,21 +256,21 @@ def load_train_data(path, delimiter):
 
 def main():
     print("Loading train data...")
-    (train, adjlist, sparse_matrix) = load_train_data("data/Celegans.txt", delimiter=' ')
+    (train, adjlist, sparse_matrix) = load_train_data("data/train.txt", delimiter='\t')
 
     print("Loading test data...")
-    (test, test_dict) = load_test_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
+    (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t', with_index=True)
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=10, adjlist=adjlist)
 
     feature_vector_path = "train_feature_vectors.txt"
 
-    #print("Saving positive train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
+    print("Saving positive train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=sparse_matrix)
 
-    #print("Saving negative train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=sparse_matrix)
+    print("Saving negative train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=sparse_matrix)
 
     print("Training...")
     model = train_svm(feature_vector_path, network=sparse_matrix)
