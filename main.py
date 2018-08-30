@@ -6,12 +6,14 @@ from sklearn.svm import SVC
 import random
 import time
 import progressbar
-
+from random import shuffle
 
 def save_train_feature_vectors(path, train_data, label, network):
-    bar = progressbar.ProgressBar(max_value=len(train_data))
+    limitor = 2000
+    bar = progressbar.ProgressBar(max_value = 2000)
     f = open(path, "a")
     i = 0
+    shuffle(train_data) 
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
         string = str(x) + '\t' + str(y) + '\t' + str(label)
@@ -23,7 +25,7 @@ def save_train_feature_vectors(path, train_data, label, network):
         if (i == len(train_data)):
             time.sleep(0.1)
         bar.update(i)
-        if (i == 101):
+        if (i == 2000):
             break
     print('\n')
     return None
@@ -52,8 +54,8 @@ def train_svm(path):
 def test_svm(model, test_data, test_dict, network):
     testset = []
     with open("test_output.csv", "a") as f:
-        bar = progressbar.ProgressBar(max_value=len(test_data))
-        f.write("Id,Prediction")
+        bar = progressbar.ProgressBar(max_value=len(test_data)+1)
+        f.write("Id,Prediction\n")
         i = 1
         for (x, y) in test_data:
             feature = feature_extraction((x, y), network)
@@ -208,7 +210,7 @@ def main():
     (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t', with_index=True)
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=100, adjlist=adjlist)
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
 
     feature_vector_path = "train_feature_vectors.txt"
 
