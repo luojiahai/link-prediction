@@ -120,7 +120,7 @@ def enclosing_subgraph_extraction(link, network, h):
     sample = np.array(links)
     return sample
 
-def sample_negative_links(result_buffer, index, proress_buffer, n, starti, endi, train_data):
+def sample_negative_links(result_buffer, index, proress_buffer, n, starti, endi, adjlist):
     # print(f'Process {index} started, with parametter n:{n}, starti:{starti}, endi:{endi}')
     neg_links = []
     currenti = starti
@@ -129,7 +129,7 @@ def sample_negative_links(result_buffer, index, proress_buffer, n, starti, endi,
         x = random.randrange(n)
         y = random.randrange(n)
         # print(f'Ramdpm!')
-        if ((x, y) not in train_data):
+        if (y not in adjlist[x]):
             neg_links.append((x, y))
             currenti = currenti + 1
         proress_buffer[index] = (starti,currenti,endi)
@@ -211,7 +211,7 @@ def main():
         starti = 0 if x == 0 else int(len(train)/multi_thread) * x + 1
         endi = int(len(train)/multi_thread) * (x + 1) if x < (multi_thread - 1) else len(train)
         progress_buffer[x] = (starti,endi)
-        p = Process(target=sample_negative_links,args=(result_buffer,x,progress_buffer, len(adjlist.keys()), starti, endi, train))
+        p = Process(target=sample_negative_links,args=(result_buffer,x,progress_buffer, len(adjlist.keys()), starti, endi, adjlist))
         p.start()
     print("Monitoring progress")
     print("")
@@ -237,7 +237,7 @@ def main():
             elapsed = time.time() - time_last_measure
             processed = progress_sum - last_measume
             pts = processed/elapsed
-            eta = total_sum/pts/60/60
+            eta = (total_sum-processed)/pts/60/60
             print(f"Stats: {pts:.2f}/s, ETA:{eta:.2f}h", end=".")
 
         print("")
