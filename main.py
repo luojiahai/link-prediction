@@ -23,8 +23,6 @@ def save_train_feature_vectors(path, train_data, label, network):
         if (i == len(train_data)):
             time.sleep(0.1)
         bar.update(i)
-        if (i == 101):
-            break
     print('\n')
     return None
     
@@ -50,10 +48,9 @@ def train_svm(path):
     return model
 
 def test_svm(model, test_data, test_dict, network):
-    testset = []
     with open("test_output.csv", "a") as f:
-        bar = progressbar.ProgressBar(max_value=len(test_data))
-        f.write("Id,Prediction")
+        bar = progressbar.ProgressBar(max_value=len(test_data)+1)
+        f.write("Id,Prediction\n")
         i = 1
         for (x, y) in test_data:
             feature = feature_extraction((x, y), network)
@@ -63,6 +60,8 @@ def test_svm(model, test_data, test_dict, network):
             f.write(string + '\n')
             # progress bar update
             i = i + 1
+            if (i == len(test_data)+1):
+                time.sleep(0.1)
             bar.update(i)
         print('\n')
     return None
@@ -143,12 +142,12 @@ def sample_negative_links(n, size, adjlist):
             if (i == size):
                 time.sleep(0.1)
             bar.update(i)
-        else:
-            i = i - 1
     print('\n')
     return neg_links
 
 def load_test_data(path, delimiter, with_index):
+    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+    pb_i = 0
     test = []
     test_dict = {}
     with open(path, "r") as f:
@@ -168,13 +167,18 @@ def load_test_data(path, delimiter, with_index):
                 v2 = int(splited[1])
                 # construct (x, y) tuple
                 test.append((v1, v2))
+            # progress bar update
+            pb_i = pb_i + 1
+            bar.update(i)
+        print('\n')
     return (test, test_dict)
 
 def load_train_data(path, delimiter):
+    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
+    pb_i = 0
     train = []
     adjlist = {}    # adjacency list
     network = nx.Graph()
-
     with open(path, "r") as f:
         for line in f:
             # split the line
@@ -194,7 +198,10 @@ def load_train_data(path, delimiter):
                 network.add_edge(v1, v2)
                 # construct (x, y) tuple
                 train.append((v1, v2))
-    
+            # progress bar update
+            pb_i = pb_i + 1
+            bar.update(i)
+        print('\n')
     return (train, adjlist, network)
 
 def main():
@@ -205,7 +212,7 @@ def main():
     (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t', with_index=True)
 
     print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=100, adjlist=adjlist)
+    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
 
     feature_vector_path = "train_feature_vectors.txt"
 
