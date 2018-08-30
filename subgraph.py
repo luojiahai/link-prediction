@@ -4,17 +4,25 @@ from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
 import random
+import time
+import progressbar
 
 
 def save_train_feature_vectors(path, train_data, label, network):
+    bar = progressbar.ProgressBar(max_value=len(train_data))
     f = open(path, "a")
+    i = 0
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
         string = str(x) + '\t' + str(y) + '\t' + str(label)
         for elem in feature:
             string += '\t' + str(elem)
         f.write(string + '\n')
-        print("Writing " + str((x, y)) + ' ' + str(label))
+        # progress bar update
+        i = i + 1
+        if (i == len(train_data)):
+            time.sleep(0.1)
+        bar.update(i)
     return None
     
 def train_svm(path, network):
@@ -119,6 +127,7 @@ def enclosing_subgraph_extraction(link, network, h):
     return sample
 
 def sample_negative_links(n, size, adjlist):
+    bar = progressbar.ProgressBar(max_value=size)
     neg_links = []
     i = 0
     while i < size:
@@ -127,6 +136,10 @@ def sample_negative_links(n, size, adjlist):
         if (y not in adjlist[x]):
             neg_links.append((x, y))
             i = i + 1
+            # progress bar update
+            if (i == size):
+                time.sleep(0.1)
+            bar.update(i)
         else:
             i = i - 1
     return neg_links
