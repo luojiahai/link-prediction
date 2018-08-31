@@ -21,19 +21,41 @@ def save_train_feature_vectors(path, train_data, label, network, size=None):
     end = len(train_data)
     if (size):
         end = size
-    for (x, y) in train_data:
+    for i in range(end):
+        rand = random.randrange(len(train_data))
+        randed = []
+        while rand in randed:
+            rand = random.randrange(len(train_data))
+        randed.append(rand)
+        (x, y) = train_data[rand]
         feature = feature_extraction((x, y), network)
         string = str(x) + '\t' + str(y) + '\t' + str(label)
         for elem in feature:
             string += '\t' + str(elem)
-        f.write(string + '\n')
+        if ((label == 1) and (feature[0] < 0.2)):
+            continue
+        elif ((label == 0) and ((feature[0] >= 0.2) or (feature[0] == 0))):
+            continue
+        else:
+            f.write(string + '\n')
         # progress bar update
-        i = i + 1
+            i = i + 1
         if (i == end):
             time.sleep(0.1)
         bar.update(i)
-        if (i == end):
-            break
+    #for (x, y) in train_data:
+    #    feature = feature_extraction((x, y), network)
+    #    string = str(x) + '\t' + str(y) + '\t' + str(label)
+    #    for elem in feature:
+    #        string += '\t' + str(elem)
+    #    f.write(string + '\n')
+    #    # progress bar update
+    #    i = i + 1
+    #    if (i == end):
+    #        time.sleep(0.1)
+    #    bar.update(i)
+    #    if (i == end):
+    #        break
     print('\n')
     return None
     
@@ -58,7 +80,7 @@ def train_sklearn(model_name, path):
     if (model_name == "svm"):
         model = SVC(kernel='rbf', probability=True)
     elif (model_name == "dt"):
-        model = tree.DecisionTreeClassifier()
+        model = DecisionTreeClassifier()
     model.fit(X, y)
     return model
 
@@ -110,9 +132,9 @@ def feature_extraction(link, network):
     #common_neighbors = len(list(nx.common_neighbors(network, x, y)))
     #feature.append(common_neighbors)
     # jaccard coefficient
-    (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
-    feature.append(jaccard_coefficient)
-    ## preferential attachment
+    #(_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
+    #feature.append(jaccard_coefficient)
+    # preferential attachment
     #(_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
     #feature.append(preferential_attachment)
     # adamic adar index
@@ -216,31 +238,31 @@ def load_train_data(test_ratio, path, delimiter):
 
 def main():
     print("Loading train and test data...")
-    (train_pos, train_neg, test, network) = load_train_data(test_ratio=0, path="data/train.txt", delimiter='\t')
+    (train_pos, train_neg, test, network) = load_train_data(test_ratio=0.1, path="data/Celegans.txt", delimiter=' ')
 
     print("Loading predict data...")
-    (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+    (predict, predict_dict) = load_predict_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
 
-    feature_vector_path = "feature_vectors.txt"
+    feature_vector_path = "feature_vectors_1.txt"
 
     flag = True
     if (flag):
         print("Saving positive train data...")
-        save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network, size=100)
+        save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network, size=200)
 
         print("Saving negative train data...")
-        save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network, size=100)
+        save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network, size=400)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
 
-    test_flag = False
+    test_flag = True
     if (test_flag):
         print("Testing...")
         test_sklearn(model, test_data=test, network=network)
 
     print("Predicting...")
-    predict_sklearn(model, predict_data=predict, network=network, path="predict_output_svm_rbf.csv")
+    predict_sklearn(model, predict_data=test, network=network, path="predict_output_svm_rbf.csv")
 
 if __name__ == "__main__":
     main()
