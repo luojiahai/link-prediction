@@ -8,6 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import GridSearchCV
 from sklearn import metrics
+from sklearn.metrics import classification_report
 import random
 import time
 import progressbar
@@ -28,6 +29,8 @@ def save_train_feature_vectors(path, train_data, label, network):
         if (i == len(train_data)):
             time.sleep(0.1)
         bar.update(i)
+        if (i == 100):
+            break
     print('\n')
     return None
     
@@ -60,20 +63,20 @@ def test_sklearn(fitted_model, test_data, network):
     bar = progressbar.ProgressBar(max_value=len(test_data)+1)
     i = 1
     y_true = []
-    y_pred = []
+    y_score = []
     for (link, label) in test_data.items():
         feature = feature_extraction(link, network)
         results = fitted_model.predict_proba([feature])[0]
         prob_per_class_dictionary = dict(zip(fitted_model.classes_, results))
         y_true.append(label)
-        y_pred.append(prob_per_class_dictionary[1])
+        y_score.append(prob_per_class_dictionary[1])
         # progress bar update
         i = i + 1
         if (i == len(test_data)+1):
             time.sleep(0.1)
         bar.update(i)
     print('\n')
-    fpr, tpr, thresholds = metrics.roc_curve(np.array(y_true), np.array(y_pred), pos_label=1)
+    fpr, tpr, thresholds = metrics.roc_curve(np.array(y_true), np.array(y_score), pos_label=1)
     print("AUC: " + str(metrics.auc(fpr, tpr)))
     return None
 
@@ -210,27 +213,27 @@ def load_train_data(test_ratio, path, delimiter):
 
 def main():
     print("Loading train and test data...")
-    (train_pos, train_neg, test, network) = load_train_data(test_ratio=0.1, path="data/Celegans.txt", delimiter=' ')
+    (train_pos, train_neg, test, network) = load_train_data(test_ratio=0, path="data/train.txt", delimiter='\t')
 
     print("Loading predict data...")
-    (predict, predict_dict) = load_predict_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
+    (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
 
     feature_vector_path = "feature_vectors.txt"
 
-    #print("Saving positive train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
+    print("Saving positive train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
 
-    #print("Saving negative train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
+    print("Saving negative train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
 
-    print("Testing...")
-    test_sklearn(model, test_data=test, network=network)
+    #print("Testing...")
+    #test_sklearn(model, test_data=test, network=network)
 
     print("Predicting...")
-    predict_sklearn(model, predict_data=test, network=network, path="predict_output_svm_rbf.txt")
+    predict_sklearn(model, predict_data=predict, network=network, path="predict_output_svm_rbf.csv")
 
 if __name__ == "__main__":
     main()
