@@ -3,6 +3,10 @@ import networkx as nx
 from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV
 import random
 import time
 import progressbar
@@ -26,11 +30,7 @@ def save_train_feature_vectors(path, train_data, label, network):
     print('\n')
     return None
     
-def train_svm(path):
-    model = SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,
-                decision_function_shape='ovr', degree=3, gamma='auto', kernel='rbf',
-                max_iter=-1, probability=True, random_state=None, shrinking=True,
-                tol=0.001, verbose=False)
+def train_sklearn(model_name, path):
     X = []
     y = []
     with open(path, "r") as f:
@@ -40,27 +40,39 @@ def train_svm(path):
             # y = int(splited[1])
             label = int(splited[2])
             feature = []
-            for i in range(3, len(splited)):
-                feature.append(splited[i])
+            #for i in range(3, len(splited)):
+            #feature.append(splited[3])
+            feature.append(splited[4])
+            #feature.append(splited[5])
+            #feature.append(splited[6])
+            feature.append(splited[7])
             X.append(feature)
             y.append(label)
+
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+    model = None
+    if (model_name == "svm"):
+        model = SVC(kernel='rbf', probability=True)
+    elif (model_name == "dt"):
+        model = tree.DecisionTreeClassifier()
     model.fit(X, y)
     return model
 
-def test_svm(model, test_data, test_dict, network):
-    with open("test_output.csv", "a") as f:
-        bar = progressbar.ProgressBar(max_value=len(test_data)+1)
+def predict_sklearn(fitted_model, predict_data, network, path):
+    with open(path, "w") as f:
+        bar = progressbar.ProgressBar(max_value=len(predict_data)+1)
         f.write("Id,Prediction\n")
         i = 1
-        for (x, y) in test_data:
+        for (x, y) in predict_data:
             feature = feature_extraction((x, y), network)
-            results = model.predict_proba([feature])[0]
-            prob_per_class_dictionary = dict(zip(model.classes_, results))
+            results = fitted_model.predict_proba([feature])[0]
+            prob_per_class_dictionary = dict(zip(fitted_model.classes_, results))
             string = str(i) + ',' + str(prob_per_class_dictionary[1])
             f.write(string + '\n')
             # progress bar update
             i = i + 1
-            if (i == len(test_data)+1):
+            if (i == len(predict_data)+1):
                 time.sleep(0.1)
             bar.update(i)
         print('\n')
@@ -71,17 +83,17 @@ def feature_extraction(link, network):
     (x, y) = link
     
     # common neighbors
-    common_neighbors = len(list(nx.common_neighbors(network, x, y)))
-    feature.append(common_neighbors)
+    #common_neighbors = len(list(nx.common_neighbors(network, x, y)))
+    #feature.append(common_neighbors)
     # jaccard coefficient
     (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
     feature.append(jaccard_coefficient)
-    # preferential attachment
-    (_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
-    feature.append(preferential_attachment)
+    ## preferential attachment
+    #(_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
+    #feature.append(preferential_attachment)
     # adamic adar index
-    (_, _, adamic_adar_index) = list(nx.adamic_adar_index(network, [(x, y)]))[0]
-    feature.append(adamic_adar_index)
+    #(_, _, adamic_adar_index) = list(nx.adamic_adar_index(network, [(x, y)]))[0]
+    #feature.append(adamic_adar_index)
     # resource allocation index
     (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
     feature.append(resource_allocation_index)
@@ -169,7 +181,7 @@ def load_test_data(path, delimiter, with_index):
                 test.append((v1, v2))
             # progress bar update
             pb_i = pb_i + 1
-            bar.update(i)
+            bar.update(pb_i)
         print('\n')
     return (test, test_dict)
 
@@ -200,33 +212,33 @@ def load_train_data(path, delimiter):
                 train.append((v1, v2))
             # progress bar update
             pb_i = pb_i + 1
-            bar.update(i)
+            bar.update(pb_i)
         print('\n')
     return (train, adjlist, network)
 
 def main():
     print("Loading train data...")
-    (train, adjlist, network) = load_train_data("data/train.txt", delimiter='\t')
+    (train, adjlist, network) = load_train_data("data/Celegans.txt", delimiter=' ')
 
     print("Loading test data...")
-    (test, test_dict) = load_test_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+    (test, test_dict) = load_test_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
 
-    print("Sampling negative links...")
-    neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
+    #print("Sampling negative links...")
+    #neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
 
     feature_vector_path = "train_feature_vectors.txt"
 
-    print("Saving positive train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=network)
+    #print("Saving positive train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=network)
 
-    print("Saving negative train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=network)
+    #print("Saving negative train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=network)
 
     print("Training...")
-    model = train_svm(feature_vector_path)
+    model = train_sklearn("svm", feature_vector_path)
 
-    print("Testing...")
-    test_svm(model, test_data=test, test_dict=test_dict, network=network)
+    print("Predicting...")
+    predict_sklearn(model, predict_data=test, network=network, path="predict_output_svm_rbf_ms.txt")
 
 if __name__ == "__main__":
     main()
