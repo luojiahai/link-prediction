@@ -217,11 +217,11 @@ def main():
 
     feature_vector_path = "feature_vectors.txt"
 
-    print("Saving positive train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
+    #print("Saving positive train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
 
-    print("Saving negative train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
+    #print("Saving negative train data...")
+    #save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
@@ -230,7 +230,7 @@ def main():
     test_sklearn(model, test_data=test, network=network)
 
     print("Predicting...")
-    predict_sklearn(model, predict_data=predict, network=network, path="predict_output_svm_rbf.txt")
+    predict_sklearn(model, predict_data=test, network=network, path="predict_output_svm_rbf.txt")
 
 if __name__ == "__main__":
     main()
