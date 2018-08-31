@@ -7,6 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import GridSearchCV
+from sklearn import metrics
 import random
 import time
 import progressbar
@@ -40,12 +41,8 @@ def train_sklearn(model_name, path):
             # y = int(splited[1])
             label = int(splited[2])
             feature = []
-            #for i in range(3, len(splited)):
-            #feature.append(splited[3])
-            feature.append(splited[4])
-            #feature.append(splited[5])
-            #feature.append(splited[6])
-            feature.append(splited[7])
+            for i in range(3, len(splited)):
+                feature.append(splited[i])
             X.append(feature)
             y.append(label)
 
@@ -58,6 +55,27 @@ def train_sklearn(model_name, path):
         model = tree.DecisionTreeClassifier()
     model.fit(X, y)
     return model
+
+def test_sklearn(fitted_model, test_data, network):
+    bar = progressbar.ProgressBar(max_value=len(test_data)+1)
+    i = 1
+    y_true = []
+    y_pred = []
+    for (link, label) in test_data.items():
+        feature = feature_extraction(link, network)
+        results = fitted_model.predict_proba([feature])[0]
+        prob_per_class_dictionary = dict(zip(fitted_model.classes_, results))
+        y_true.append(label)
+        y_pred.append(prob_per_class_dictionary[1])
+        # progress bar update
+        i = i + 1
+        if (i == len(test_data)+1):
+            time.sleep(0.1)
+        bar.update(i)
+    print('\n')
+    fpr, tpr, thresholds = metrics.roc_curve(np.array(y_true), np.array(y_pred), pos_label=1)
+    print("AUC: " + str(metrics.auc(fpr, tpr)))
+    return None
 
 def predict_sklearn(fitted_model, predict_data, network, path):
     with open(path, "w") as f:
@@ -100,48 +118,7 @@ def feature_extraction(link, network):
     
     return feature
 
-def list_complement(list1, list2):
-    return [elem for elem in list1 if elem not in list2]
-
-def list_union(list1, list2):
-    output = list1
-    for elem in list2:
-        if elem not in output:
-            output.append(elem)
-    return output
-
-def neighbors(fringe, network):
-    output = []
-    for i in range(len(fringe)):
-        ind = fringe[i]
-        x = ind[0]
-        y = ind[1]
-        xy = network.getrow(x).nonzero()[1]
-        yx = network.getcol(y).nonzero()[0]
-        for elem in xy:
-            link = [x, elem]
-            if link not in output:
-                output.append(link)
-        for elem in yx:
-            link = [elem, y]
-            if link not in output:
-                output.append(link)
-    return output
-
-def enclosing_subgraph_extraction(link, network, h):
-    (x, y) = link
-    fringe = links = [[x, y]]
-    for dist in range(h):
-        if len(fringe) == 0:
-            break
-        fringe = neighbors(fringe, network)
-        fringe = list_complement(fringe, links)
-        links = list_union(links, fringe)
-    sample = np.array(links)
-    return sample
-
-def sample_negative_links(n, size, adjlist):
-    bar = progressbar.ProgressBar(max_value=size)
+def sample_negative_links(size, n, adjlist):
     neg_links = []
     i = 0
     while i < size:
@@ -150,14 +127,9 @@ def sample_negative_links(n, size, adjlist):
         if (y not in adjlist[x]):
             neg_links.append((x, y))
             i = i + 1
-            # progress bar update
-            if (i == size):
-                time.sleep(0.1)
-            bar.update(i)
-    print('\n')
     return neg_links
 
-def load_test_data(path, delimiter, with_index):
+def load_predict_data(path, delimiter, with_index):
     bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
     pb_i = 0
     test = []
@@ -185,10 +157,12 @@ def load_test_data(path, delimiter, with_index):
         print('\n')
     return (test, test_dict)
 
-def load_train_data(path, delimiter):
+def load_train_data(test_ratio, path, delimiter):
     bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
     pb_i = 0
-    train = []
+
+    train_pos = []
+    test = {}
     adjlist = {}    # adjacency list
     network = nx.Graph()
     with open(path, "r") as f:
@@ -209,36 +183,54 @@ def load_train_data(path, delimiter):
                 # construct network
                 network.add_edge(v1, v2)
                 # construct (x, y) tuple
-                train.append((v1, v2))
+                train_pos.append((v1, v2))
             # progress bar update
             pb_i = pb_i + 1
             bar.update(pb_i)
         print('\n')
-    return (train, adjlist, network)
+
+    print("Sampling negative links...")
+    train_neg = sample_negative_links(len(train_pos), len(adjlist.keys()), adjlist)
+
+    test_size = (len(train_pos) + len(train_neg)) * test_ratio
+    i_pos = 0
+    while i_pos < test_size/2:
+        rand = random.randrange(len(train_pos))
+        if train_pos[rand] not in test:
+            test[train_pos[rand]] = 1
+            i_pos = i_pos + 1
+    i_neg = 0
+    while i_neg < test_size/2:
+        rand = random.randrange(len(train_neg))
+        if train_neg[rand] not in test:
+            test[train_neg[rand]] = 0
+            i_neg = i_neg + 1
+
+    return (train_pos, train_neg, test, network)
 
 def main():
-    print("Loading train data...")
-    (train, adjlist, network) = load_train_data("data/Celegans.txt", delimiter=' ')
+    print("Loading train and test data...")
+    (train_pos, train_neg, test, network) = load_train_data(test_ratio=0.1, path="data/Celegans.txt", delimiter=' ')
 
-    print("Loading test data...")
-    (test, test_dict) = load_test_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
+    print("Loading predict data...")
+    (predict, predict_dict) = load_predict_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
 
-    #print("Sampling negative links...")
-    #neg_links = sample_negative_links(n=len(adjlist.keys()), size=len(train), adjlist=adjlist)
+    feature_vector_path = "feature_vectors.txt"
 
-    feature_vector_path = "train_feature_vectors.txt"
+    print("Saving positive train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
 
-    #print("Saving positive train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=train, label=1, network=network)
-
-    #print("Saving negative train data...")
-    #save_train_feature_vectors(feature_vector_path, train_data=neg_links, label=0, network=network)
+    print("Saving negative train data...")
+    save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
 
+    print("Testing...")
+    test_sklearn(model, test_data=test, network=network)
+
     print("Predicting...")
-    predict_sklearn(model, predict_data=test, network=network, path="predict_output_svm_rbf_ms.txt")
+    predict_sklearn(model, predict_data=predict, network=network, path="predict_output_svm_rbf.txt")
 
 if __name__ == "__main__":
     main()
