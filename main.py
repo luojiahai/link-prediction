@@ -21,7 +21,7 @@ def save_train_feature_vectors(path, train_data, label, network, size=None):
     end = len(train_data)
     if (size):
         end = size
-    for i in range(end):
+    while i < end:
         rand = random.randrange(len(train_data))
         randed = []
         while rand in randed:
@@ -32,9 +32,9 @@ def save_train_feature_vectors(path, train_data, label, network, size=None):
         string = str(x) + '\t' + str(y) + '\t' + str(label)
         for elem in feature:
             string += '\t' + str(elem)
-        if ((label == 1) and (feature[0] < 0.2)):
+        if ((label == 1) and (feature[0] < 1)):
             continue
-        elif ((label == 0) and ((feature[0] >= 0.2) or (feature[0] == 0))):
+        elif ((label == 0) and ((feature[0] >= 0.25) or (feature[0] == 0))):
             continue
         else:
             f.write(string + '\n')
@@ -248,10 +248,10 @@ def main():
     flag = True
     if (flag):
         print("Saving positive train data...")
-        save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network, size=200)
+        save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network, size=100)
 
         print("Saving negative train data...")
-        save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network, size=400)
+        save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network, size=200)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
