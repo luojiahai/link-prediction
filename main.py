@@ -14,10 +14,13 @@ import time
 import progressbar
 
 
-def save_train_feature_vectors(path, train_data, label, network):
+def save_train_feature_vectors(path, train_data, label, network, size=None):
     bar = progressbar.ProgressBar(max_value=len(train_data))
     f = open(path, "a")
     i = 0
+    end = len(train_data)
+    if (size):
+        end = size
     for (x, y) in train_data:
         feature = feature_extraction((x, y), network)
         string = str(x) + '\t' + str(y) + '\t' + str(label)
@@ -26,10 +29,10 @@ def save_train_feature_vectors(path, train_data, label, network):
         f.write(string + '\n')
         # progress bar update
         i = i + 1
-        if (i == len(train_data)):
+        if (i == end):
             time.sleep(0.1)
         bar.update(i)
-        if (i == 100):
+        if (i == end):
             break
     print('\n')
     return None
@@ -220,17 +223,21 @@ def main():
 
     feature_vector_path = "feature_vectors.txt"
 
-    print("Saving positive train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network)
+    flag = True
+    if (flag):
+        print("Saving positive train data...")
+        save_train_feature_vectors(feature_vector_path, train_data=train_pos, label=1, network=network, size=100)
 
-    print("Saving negative train data...")
-    save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network)
+        print("Saving negative train data...")
+        save_train_feature_vectors(feature_vector_path, train_data=train_neg, label=0, network=network, size=100)
 
     print("Training...")
     model = train_sklearn("svm", feature_vector_path)
 
-    #print("Testing...")
-    #test_sklearn(model, test_data=test, network=network)
+    test_flag = False
+    if (test_flag):
+        print("Testing...")
+        test_sklearn(model, test_data=test, network=network)
 
     print("Predicting...")
     predict_sklearn(model, predict_data=predict, network=network, path="predict_output_svm_rbf.csv")
