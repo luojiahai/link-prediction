@@ -27,6 +27,9 @@
     <Compile Include="helper.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="temp.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="subgraph.py" />
   </ItemGroup>
   <ItemGroup>
