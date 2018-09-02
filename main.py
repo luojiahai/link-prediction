@@ -5,7 +5,9 @@ import numpy as np
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn import metrics
 from sklearn.metrics import classification_report
 import random
@@ -13,13 +15,17 @@ import time
 import progressbar
 
 
+def sigmoid(x):
+  return 1 / (1 + math.exp(-x))
+
 def save_train_feature_vectors(path, train_pos, train_neg, network, size=None):
-    f = open(path, "a")
+    f = open(path, "w")
     i = 0
     end = len(train_pos)+len(train_neg)
     if (size):
         end = size
-    end = end / 2
+    print("Saving positive links...")
+    bar_pos = progressbar.ProgressBar(max_value=int(end / 2))
     while i < (end / 2):
         rand = random.randrange(len(train_pos))
         randed = []
@@ -33,6 +39,12 @@ def save_train_feature_vectors(path, train_pos, train_neg, network, size=None):
             string += '\t' + str(elem)
         f.write(string + '\n')
         i = i + 1
+        if (i == int(end / 2)):
+            time.sleep(0.1)
+        bar_pos.update(i)
+    print('\n')
+    print("Saving negative links...")
+    bar_neg = progressbar.ProgressBar(max_value=int(end / 2))
     while i < end:
         rand = random.randrange(len(train_neg))
         randed = []
@@ -46,8 +58,22 @@ def save_train_feature_vectors(path, train_pos, train_neg, network, size=None):
             string += '\t' + str(elem)
         f.write(string + '\n')
         i = i + 1
+        if (i == end):
+            time.sleep(0.1)
+        bar_neg.update(i - int(end / 2))
+    print('\n')
     return None
-    
+
+def save_predict_feature_vectors(path, predict_data, network):
+    f = open(path, "w")
+    for (x, y) in predict_data:
+        feature = feature_extraction((x, y), network)
+        string = str(x) + '\t' + str(y)
+        for elem in feature:
+            string += '\t' + str(elem)
+        f.write(string + '\n')
+    return None
+
 def train_sklearn(model_name, path):
     X = []
     y = []
@@ -62,16 +88,21 @@ def train_sklearn(model_name, path):
                 feature.append(splited[i])
             X.append(feature)
             y.append(label)
-    #scaler = StandardScaler()
-    #X = scaler.fit_transform(X)
-    #print(X)
     model = None
-    if (model_name == "svm"):
-        model = SVC(kernel='rbf', probability=True)
+    if (model_name == "svm_rbf"):
+        model = SVC(C=8.0, kernel='rbf', probability=True)
+    elif (model_name == "svm_linear"):
+        model = SVC(C=8.0, kernel='linear', probability=True)
     elif (model_name == "dt"):
         model = DecisionTreeClassifier()
     elif (model_name == "lg"):
         model = LogisticRegression()
+    elif (model_name == "knn"):
+        model = KNeighborsClassifier(n_neighbors=12)
+    elif (model_name == "bagging"):
+        model = BaggingClassifier()
+    elif (model_name == "mlp"):
+        model = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1)
     model.fit(X, y)
     return model
 
@@ -105,22 +136,26 @@ def test_sklearn(fitted_model, test_data, network):
     return None
 
 def predict_sklearn(fitted_model, predict_data, network, path):
-    with open(path, "w") as f:
-        bar = progressbar.ProgressBar(max_value=len(predict_data)+1)
-        f.write("Id,Prediction\n")
-        i = 1
-        for (x, y) in predict_data:
-            feature = feature_extraction((x, y), network)
-            results = fitted_model.predict_proba([feature])[0]
-            prob_per_class_dictionary = dict(zip(fitted_model.classes_, results))
-            string = str(i) + ',' + str(prob_per_class_dictionary[1])
-            f.write(string + '\n')
-            # progress bar update
-            i = i + 1
-            if (i == len(predict_data)+1):
-                time.sleep(0.1)
-            bar.update(i)
-        print('\n')
+    of = open(path, "w")
+    f = open("predict_feature_vectors.txt", "r")
+    bar = progressbar.ProgressBar(max_value=len(predict_data)+1)
+    of.write("Id,Prediction\n")
+    i = 1
+    for line in f:
+        splited = line.rstrip().split('\t')
+        feature = []
+        for ind in range(2, len(splited)):
+            feature.append(splited[ind])
+        results = fitted_model.predict_proba([feature])[0]
+        prob_per_class_dictionary = dict(zip(fitted_model.classes_, results))
+        string = str(i) + ',' + str(prob_per_class_dictionary[1])
+        of.write(string + '\n')
+        # progress bar update
+        i = i + 1
+        if (i == len(predict_data)+1):
+            time.sleep(0.1)
+        bar.update(i)
+    print('\n')
     return None
 
 def feature_extraction(link, network):
@@ -128,17 +163,17 @@ def feature_extraction(link, network):
     (x, y) = link
     
     # common neighbors
-    #common_neighbors = len(list(nx.common_neighbors(network, x, y)))
-    #feature.append(common_neighbors)
+    common_neighbors = len(list(nx.common_neighbors(network, x, y)))
+    feature.append(sigmoid(common_neighbors))
     # jaccard coefficient
     (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
-    feature.append(jaccard_coefficient)
+    feature.append(sigmoid(jaccard_coefficient))
     # preferential attachment
-    #(_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
-    #feature.append(preferential_attachment)
+    (_, _, preferential_attachment) = list(nx.preferential_attachment(network, [(x, y)]))[0]
+    feature.append(sigmoid(preferential_attachment))
     # adamic adar index
     (_, _, adamic_adar_index) = list(nx.adamic_adar_index(network, [(x, y)]))[0]
-    feature.append(adamic_adar_index)
+    feature.append(sigmoid(adamic_adar_index))
     # resource allocation index
     (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
     feature.append(resource_allocation_index)
@@ -249,16 +284,21 @@ def main():
         print("Saving train data...")
         save_train_feature_vectors(feature_vector_path, train_pos=train_pos, train_neg=train_neg, network=network, size=200)
 
-    print("Training...")
-    model = train_sklearn("svm", feature_vector_path)
+    save_predict_feature_vectors(path="predict_feature_vectors.txt", predict_data=predict, network=network)
 
-    test_flag = True
-    if (test_flag):
-        print("Testing...")
-        test_sklearn(model, test_data=test, network=network)
+    models = ["svm_rbf", "svm_linear", "knn", "bagging"]
+    for model_name in models:
+        print("Training " + model_name + "...")
+        model = train_sklearn(model_name, feature_vector_path)
 
-    print("Predicting...")
-    predict_sklearn(model, predict_data=predict, network=network, path="predict_output_lg.csv")
+        test_flag = True
+        if (test_flag):
+            print("Testing " + model_name + "...")
+            test_sklearn(model, test_data=test, network=network)
+
+        output_file_name = "predict_output_" + model_name + ".csv" 
+        print("Predicting " + model_name + "...")
+        predict_sklearn(model, predict_data=predict, network=network, path=output_file_name)
 
 if __name__ == "__main__":
     main()
