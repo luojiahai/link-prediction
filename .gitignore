@@ -4,3 +4,5 @@ data
 graph
 emb
 software
+predict_output_*.csv
+*_feature_vectors.txt

@@ -301,7 +301,7 @@ def main():
     flag = True
     if (flag):
         print("Saving train data...")
-        save_train_feature_vectors(path="train_feature_vectors.txt", train_pos=train_pos, train_neg=train_neg, network=network, size=400)
+        save_train_feature_vectors(path="train_feature_vectors.txt", train_pos=train_pos, train_neg=train_neg, network=network, size=None)
 
         print("Saving test data...")
         save_test_feature_vectors(path="test_feature_vectors.txt", test_data=test, network=network)
