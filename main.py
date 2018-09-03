@@ -1,6 +1,5 @@
 import math
 import networkx as nx
-from scipy import sparse
 import numpy as np
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -293,28 +292,26 @@ def load_train_data(test_size, path, delimiter):
 
 def main():
     print("Loading train and test data...")
-    (train_pos, train_neg, test, network) = load_train_data(test_size=500, path="data/Celegans.txt", delimiter=' ')
+    (train_pos, train_neg, test, network) = load_train_data(test_size=2000, path="data/Celegans.txt", delimiter=' ')
 
     print("Loading predict data...")
     (predict, predict_dict) = load_predict_data("data/Celegans_test.txt", delimiter=' ', with_index=False)
 
-    feature_vector_path = "train_feature_vectors.txt"
-
     flag = True
     if (flag):
         print("Saving train data...")
-        save_train_feature_vectors(feature_vector_path, train_pos=train_pos, train_neg=train_neg, network=network, size=2000)
+        save_train_feature_vectors(path="train_feature_vectors.txt", train_pos=train_pos, train_neg=train_neg, network=network, size=400)
 
         print("Saving test data...")
         save_test_feature_vectors(path="test_feature_vectors.txt", test_data=test, network=network)
 
-    print("Saving predict data...")
-    save_predict_feature_vectors(path="predict_feature_vectors.txt", predict_data=predict, network=network)
+        print("Saving predict data...")
+        save_predict_feature_vectors(path="predict_feature_vectors.txt", predict_data=predict, network=network)
 
-    models = ["svm_rbf", "knn", "bagging", "mlp", "lg"]
+    models = ["svm_rbf", "svm_linear", "knn", "bagging", "mlp", "lg"]
     for model_name in models:
         print("Training " + model_name + "...")
-        model = train_sklearn(model_name, feature_vector_path)
+        model = train_sklearn(model_name, path="train_feature_vectors.txt")
 
         test_flag = True
         if (test_flag):
