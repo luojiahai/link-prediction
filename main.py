@@ -12,6 +12,7 @@ from sklearn.metrics import classification_report
 import random
 import time
 import progressbar
+from random import shuffle
 
 
 def sigmoid(x):
