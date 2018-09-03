@@ -100,10 +100,10 @@ def save_predict_feature_vectors(path, predict_data, network):
     print('\n')
     return None
 
-def train_sklearn(model_name, path):
+def train_sklearn(model_name, in_path):
     X = []
     y = []
-    with open(path, "r") as f:
+    with open(in_path, "r") as f:
         for line in f:
             splited = line.rstrip().split('\t')
             label = int(splited[2])
@@ -130,12 +130,12 @@ def train_sklearn(model_name, path):
     model.fit(X, y)
     return model
 
-def test_sklearn(fitted_model, test_data, network):
+def test_sklearn(fitted_model, test_data, network, in_path):
     bar = progressbar.ProgressBar(max_value=len(test_data))
     i = 1
     y_true = []
     y_score = []
-    f = open("test_feature_vectors.txt", "r")
+    f = open(in_path, "r")
     for line in f:
         splited = line.rstrip().split('\t')
         label = int(splited[2])
@@ -157,9 +157,9 @@ def test_sklearn(fitted_model, test_data, network):
     print("AUC: " + str(metrics.auc(fpr, tpr)))
     return None
 
-def predict_sklearn(fitted_model, predict_data, network, path):
-    of = open(path, "w")
-    f = open("predict_feature_vectors.txt", "r")
+def predict_sklearn(fitted_model, predict_data, network, in_path, out_path):
+    of = open(out_path, "w")
+    f = open(in_path, "r")
     bar = progressbar.ProgressBar(max_value=len(predict_data))
     of.write("Id,Prediction\n")
     i = 1
@@ -301,27 +301,28 @@ def main():
     flag = True
     if (flag):
         print("Saving train data...")
-        save_train_feature_vectors(path="train_feature_vectors.txt", train_pos=train_pos, train_neg=train_neg, network=network, size=None)
+        save_train_feature_vectors(path="out/train_feature_vectors.txt", train_pos=train_pos, train_neg=train_neg, network=network, size=None)
 
         print("Saving test data...")
-        save_test_feature_vectors(path="test_feature_vectors.txt", test_data=test, network=network)
+        save_test_feature_vectors(path="out/test_feature_vectors.txt", test_data=test, network=network)
 
         print("Saving predict data...")
-        save_predict_feature_vectors(path="predict_feature_vectors.txt", predict_data=predict, network=network)
+        save_predict_feature_vectors(path="out/predict_feature_vectors.txt", predict_data=predict, network=network)
 
     models = ["svm_rbf", "svm_linear", "knn", "bagging", "mlp", "lg"]
     for model_name in models:
         print("Training " + model_name + "...")
-        model = train_sklearn(model_name, path="train_feature_vectors.txt")
+        model = train_sklearn(model_name, in_path="out/train_feature_vectors.txt")
 
         test_flag = True
         if (test_flag):
             print("Testing " + model_name + "...")
-            test_sklearn(model, test_data=test, network=network)
+            test_sklearn(model, test_data=test, network=network, in_path="out/test_feature_vectors.txt")
 
-        output_file_name = "predict_output_" + model_name + ".csv" 
+        output_file_name = "out/predict_output_" + model_name + ".csv" 
         print("Predicting " + model_name + "...")
-        predict_sklearn(model, predict_data=predict, network=network, path=output_file_name)
+        predict_sklearn(model, predict_data=predict, network=network, 
+                        in_path="out/predict_feature_vectors.txt", out_path=output_file_name)
 
 if __name__ == "__main__":
     main()
