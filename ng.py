@@ -5,10 +5,12 @@ import progressbar
 import os.path
 import time
 import pickle
-from multiprocessing import Pool, Array, Process, Queue
+from multiprocessing import Pool, Array, Process, Queue, Manager
 from tqdm import tqdm
 from functools import partial 
 import myModule as mymodule
+import sys
+import random
 
 def load_predict_data(path, delimiter, with_index):
     bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
@@ -91,87 +93,173 @@ def feature_extraction(network,link):
     
     return jaccard_coefficient,resource_allocation_index
 
-def process_pos(network, base_node, connected_node):
+def process_pos(network, base_node, connected_node, tqdmbar=True):
     feature_set = []
     # print(f"-----------------------------------------------\nbase: {base_node}, edges:{connceted_node}")
-    for e in tqdm(connected_node):
-        try:
+    if(tqdmbar):
+        for e in tqdm(connected_node):
             ja,re = feature_extraction(network,(base_node,e))
             feature_set.append((e,ja,re))
-            # print(f"For pair {base_node}:{e}, j:{ja}, re:{re}")
-        except:
-            # print(f"Error occured")
-            pass
+    else:
+        for e in connected_node:
+            ja,re = feature_extraction(network,(base_node,e))
+            feature_set.append((e,ja,re))
     # mymodule.q.put(feature_set)
     return feature_set
-# shape adj list into blocks list
-def reshape_adj(adjlist, size):
+def reshape_adj(adjlist, size=-1, max_adjlist_size=2000):
     adj = []
     counter = 0
     for e in adjlist:
-        adj.append(e)
+        base,connected = e
+        if(len(connected)>max_adjlist_size):
+            connected = connected[:int(max_adjlist_size/len(connected)*max_adjlist_size) + 1]
+        adj.append((base,connected))
         counter = counter + 1
         if(counter == size):
             break
-
-
     return adj
 
+# shape adj list into blocks list
+def reshap_adj_to_block(adjlist, blocksize):
+    block_buffer = []
+    counter = 0
+    block_adj = []
+    for e in adjlist:
+        block_buffer.append(e)
+        counter = counter + 1
+        if(counter == blocksize):
+            counter = 0
+            block_adj.append(block_buffer)
+            block_buffer = []
+    return block_adj
+
+def file_lines_count(path):
+    counter = 0
+    with open(path,'r') as f:
+        for line in f:
+            counter = counter + 1
+
+    return counter
+
+# extracted neg - formet bas_enode|disconnected_node ja re
+def load_extracted_neg(path):
+    extracted_ng = {}
+    if(os.path.exists(path)):
+            
+        with open(path,'r') as f:
+            for line in f:
+                s = line.rstrip().split(' ')
+                extracted_ng[s[0]]=(s[1],s[2])
+    return extracted_ng
 # def initProcess(q):
 # #   mymodule.network = share
 #   mymodule.q = q
-
-def main():
-
-    persistent_network_path = "./data/persistent_network.pst"
-    extracted_node_path = "./data/extracted.ext"
-    feature_set_path = "./data/featureset.ext"
-    # attempt to load from persistant dataset
-    print("Loading train data...")
-    
-    if os.path.exists(persistent_network_path):
-        print("Persistant traning dataset found, loading")
-        start_time = time.time()
-        with open(persistent_network_path, 'rb') as f:
-            adjlist,network = pickle.load(f)
-        elapsed_time = time.time() - start_time
-        print(f"Loaded in {elapsed_time}s")
-    else:
-        # falling back to normal dataset
-        print("Persistant traning network not found, loading from dataset")
-        adjlist,network = load_train_data(path="data/train.txt", delimiter='\t')
-        print("Complete. Dumping object to disk...")
-        with open(persistent_network_path, 'wb') as f:
-            pickle.dump((adjlist,network), f, pickle.HIGHEST_PROTOCOL)
-
-    print("Loading predict data...")
-    # (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
-    
-    print("Loading already extracted node features")
-    existing_feature_list = load_exist_extracted(extracted_node_path,adjlist)
-    
-    print("Continuing feature extraction")
-    # print("Reshaping input structure")
-    # reshaped_adj = reshape_adj(adjlist.items(),4)[:40]
-    # q = Queue()
-    # pool = Pool(processes=2,initializer=initProcess,initargs=(q,))
-    # print("Processing positive datas")
-    # partial_pos = partial(process_pos, network)
-
-    # for _ in tqdm.tqdm(pool.imap(partial_pos, reshaped_adj), total=len(reshaped_adj)):
-    #     pass
-
-    reshaped = reshape_adj(adjlist.items(),10)
+def block_pos_processing(adj_block):
+    for base_node,connected_node in adj_block:
+        for e,ja,re in process_pos(network,base_node, connected_node,False):
+            q.put((base_node,e,ja,re))
+def block_writing():
+    base_node_record = {}
     with open(extracted_node_path,'a') as extracted_node_file:
         with open(feature_set_path, 'a') as feature_set_file:
-            for base_node,connected_node in tqdm(reshaped):
-                # extract feature
-                extracted_node_file.write(f"{base_node}\n")
-                for e,ja,re in process_pos(network,base_node, connected_node):
-                    feature_set_file.write(f"{base_node} {e} {ja} {re}\n")
+            for base_node,connected,ja,re  in iter(q.get, None):
+                # print(base_node)
+                feature_set_file.write(f"{base_node} {connected} {ja} {re}\n")
+                if(base_node not in base_node_record):
+                    base_node_record[base_node] = True
+                    extracted_node_file.write(f"{base_node}\n")
+                    extracted_node_file.flush()
+                feature_set_file.flush()
 
 
+def main(task):
+    if(task == 'predict'):
 
+        print("Loading predict data...")
+        # (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
 
+    elif(task == 'extract_pos'):
+
+            print("Loading already extracted node features")
+            existing_feature_list = load_exist_extracted(extracted_node_path,adjlist)
+            
+            print("Continuing feature extraction")
+            # Multi threading, not quite working....
+            # disk_writer = Process(target=block_writing)
+            # disk_writer.daemon = True
+            # disk_writer.start()
+            # pool = Pool(processes=4)
+            # # print("Processing positive datas")
+            # # partial_pos = partial(process_pos, network)
+            reshaped = reshape_adj(adjlist.items(),size=100)
+            # reshaped = reshap_adj_to_block(reshaped,1)
+            # for _ in tqdm(pool.imap(block_pos_processing, reshaped), total=len(reshaped)):
+            #     pass
+            # print("process complete.")
+
+            with open(extracted_node_path,'a') as extracted_node_file:
+                with open(feature_set_path, 'a') as feature_set_file:
+                    for base_node,connected_node in tqdm(reshaped):
+                        # extract feature
+                        for e,ja,re in process_pos(network,base_node, connected_node):
+                            feature_set_file.write(f"{base_node} {e} {ja} {re}\n")
+                        feature_set_file.flush()
+                        extracted_node_file.write(f"{base_node}\n")
+                        extracted_node_file.flush()
+    elif(task == 'extract_neg'):
+        # count extracted
+        count = file_lines_count(feature_set_path)
+        extracted_neg = load_extracted_neg(extracted_neg_path)
+        # do nothing if have already enough negs
+        if(len(extracted_neg) < count):
+            to_process = count - len(extracted_neg)
+            tqdmbar = tqdm(total=to_process)
+            # neg_counter = 0
+            print("Sampling negative set")
+            neg_set = []
+            counter = 0
+            adj_to_list = list(adjlist)
+            while counter < to_process:
+                x = random.randrange(len(adj_to_list))
+                y = random.randrange(len(adj_to_list))
+                if (x!=y and f"{adj_to_list[x]}|{adj_to_list[y]}" not in extracted_neg):
+                    neg_set.append((adj_to_list[x],adj_to_list[y]))
+                    counter = counter + 1
+                    tqdmbar.update(1)
+            tqdmbar.close()
+            with open(extracted_neg_path,'a') as f:
+                for n1,n2 in tqdm(neg_set):
+                    # print(f"neg_counter{neg_counter} < to_process{to_process}:{(neg_counter < to_process)}")
+                    ja,re = feature_extraction(network,(n1,n2))
+                    f.write(f"{n1}|{n2} {ja} {re}\n")
 if __name__ == "__main__":
-    main()
+     
+    for i in range(len(sys.argv)):
+        if (sys.argv[i] == '-t'):
+            task = sys.argv[i+1]
+    if(task != "predict"):
+        persistent_network_path = "./data/persistent_network.pst"
+        extracted_node_path = "./data/extracted.ext"
+        feature_set_path = "./data/featureset.ext"
+        extracted_neg_path = "./data/extracted_neg.ext"
+
+        # attempt to load from persistant dataset
+        print("Loading train data...")
+
+        if os.path.exists(persistent_network_path):
+            print("Persistant traning dataset found, loading")
+            start_time = time.time()
+            with open(persistent_network_path, 'rb') as f:
+                adjlist,network = pickle.load(f)
+            elapsed_time = time.time() - start_time
+            print(f"Loaded in {elapsed_time}s")
+        else:
+            # falling back to normal dataset
+            print("Persistant traning network not found, loading from dataset")
+            adjlist,network = load_train_data(path="data/train.txt", delimiter='\t')
+            print("Complete. Dumping object to disk...")
+            with open(persistent_network_path, 'wb') as f:
+                pickle.dump((adjlist,network), f, pickle.HIGHEST_PROTOCOL)
+    manager = Manager()
+    q = Queue()
+    main(task)
