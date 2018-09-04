@@ -223,7 +223,7 @@ def main(task):
               loss='binary_crossentropy',
               metrics=['accuracy'])
 
-        model.fit(data, labels, epochs=5)
+        model.fit(data, labels, epochs=20)
         # save to disk, from https://machinelearningmastery.com/save-load-keras-deep-learning-models/
         scores = model.evaluate(data, labels, verbose=0)
         print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
@@ -261,7 +261,7 @@ def main(task):
             # pool = Pool(processes=4)
             # # print("Processing positive datas")
             # # partial_pos = partial(process_pos, network)
-            reshaped = reshape_adj(adjlist.items(),size=100)
+            reshaped = reshape_adj(adjlist.items(),size=300000)
             # reshaped = reshap_adj_to_block(reshaped,1)
             # for _ in tqdm(pool.imap(block_pos_processing, reshaped), total=len(reshaped)):
             #     pass
