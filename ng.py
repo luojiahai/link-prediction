@@ -198,7 +198,7 @@ def processe_data_tensor_train(pos,neg):
 
 
 def main(task):
-    if(task == 'predict'):
+    if(task == 'train'):
         print("Loading negative instances")
         extracted_neg = list(load_extracted_neg(extracted_neg_path).values())
         print("Loading positive instances")
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     for i in range(len(sys.argv)):
         if (sys.argv[i] == '-t'):
             task = sys.argv[i+1]
-    if(task != "predict"):
+    if(task != "train"):
         # attempt to load from persistant dataset
         print("Loading train data...")
 
