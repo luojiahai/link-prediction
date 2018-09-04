@@ -11,6 +11,10 @@ from functools import partial
 import myModule as mymodule
 import sys
 import random
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import model_from_json
 
 def load_predict_data(path, delimiter, with_index):
     bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
@@ -140,7 +144,14 @@ def file_lines_count(path):
             counter = counter + 1
 
     return counter
-
+def load_extracted_pos(path):
+    extracted_pos = []
+    if(os.path.exists(path)):
+        with open(path,'r') as f:
+            for line in f:
+                s = line.rstrip().split(" ")
+                extracted_pos.append((s[0],s[1],s[2],s[3]))
+    return extracted_pos
 # extracted neg - formet bas_enode|disconnected_node ja re
 def load_extracted_neg(path):
     extracted_ng = {}
@@ -154,29 +165,88 @@ def load_extracted_neg(path):
 # def initProcess(q):
 # #   mymodule.network = share
 #   mymodule.q = q
-def block_pos_processing(adj_block):
-    for base_node,connected_node in adj_block:
-        for e,ja,re in process_pos(network,base_node, connected_node,False):
-            q.put((base_node,e,ja,re))
-def block_writing():
-    base_node_record = {}
-    with open(extracted_node_path,'a') as extracted_node_file:
-        with open(feature_set_path, 'a') as feature_set_file:
-            for base_node,connected,ja,re  in iter(q.get, None):
-                # print(base_node)
-                feature_set_file.write(f"{base_node} {connected} {ja} {re}\n")
-                if(base_node not in base_node_record):
-                    base_node_record[base_node] = True
-                    extracted_node_file.write(f"{base_node}\n")
-                    extracted_node_file.flush()
-                feature_set_file.flush()
+
+def processe_data_tensor_train(pos,neg):
+    data = []
+    labels = []
+    for x in tqdm(range(len(pos))):
+        # print(f"pos:{pos[x]}, neg:{neg[x]}")
+        _,_,ja_p,re_p = pos[x]
+        ja_n,re_n = neg[x]
+        data.append(np.array([ja_p,re_p]))
+        labels.append(True)
+        data.append(np.array([ja_n,re_n]))
+        labels.append(False)
+    return np.array(data),np.array(labels)
+
+# def block_pos_processing(adj_block):
+#     for base_node,connected_node in adj_block:
+#         for e,ja,re in process_pos(network,base_node, connected_node,False):
+#             q.put((base_node,e,ja,re))
+# def block_writing():
+#     base_node_record = {}
+#     with open(extracted_node_path,'a') as extracted_node_file:
+#         with open(feature_set_path, 'a') as feature_set_file:
+#             for base_node,connected,ja,re  in iter(q.get, None):
+#                 # print(base_node)
+#                 feature_set_file.write(f"{base_node} {connected} {ja} {re}\n")
+#                 if(base_node not in base_node_record):
+#                     base_node_record[base_node] = True
+#                     extracted_node_file.write(f"{base_node}\n")
+#                     extracted_node_file.flush()
+#                 feature_set_file.flush()
 
 
 def main(task):
     if(task == 'predict'):
-
+        print("Loading negative instances")
+        extracted_neg = list(load_extracted_neg(extracted_neg_path).values())
+        print("Loading positive instances")
+        extracted_pos = load_extracted_pos(feature_set_path)
         print("Loading predict data...")
-        # (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+        (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+        # processing data
+        print("Processing data")
+        data,labels = processe_data_tensor_train(extracted_pos,extracted_neg)
+        # Start training
+        # categorical_labels = to_categorical(labels, num_classes=2)
+        print("Building model")
+        model = keras.Sequential()
+        # Adds a densely-connected layer with 64 units to the model:
+        model.add(keras.layers.Dense(64, activation='relu', input_dim=2))
+        # Add another:
+        model.add(keras.layers.Dense(64, activation='relu'))
+        # Add a softmax layer with 10 output units:
+        model.add(keras.layers.Dense(1, activation='sigmoid'))
+
+        model.compile(optimizer='nadam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+        model.fit(data, labels, epochs=5)
+        # save to disk, from https://machinelearningmastery.com/save-load-keras-deep-learning-models/
+        scores = model.evaluate(data, labels, verbose=0)
+        print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+        # serialize model to JSON
+        model_json = model.to_json()
+        with open("model.json", "w") as j:
+            j.write(model_json)
+        # serialize weights to HDF5
+        model.save_weights("model.h5")
+        print("Model saved")
+        # load json and create model
+        # json_file = open('model.json', 'r')
+        # loaded_model_json = json_file.read()
+        # json_file.close()
+        # loaded_model = model_from_json(loaded_model_json)
+        # # load weights into new model
+        # loaded_model.load_weights("model.h5")
+        # print("Loaded model from disk")
+        
+        # # evaluate loaded model on test data
+        # loaded_model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
+        # score = loaded_model.evaluate(X, Y, verbose=0)
+        # print("%s: %.2f%%" % (loaded_model.metrics_names[1], score[1]*100))
 
     elif(task == 'extract_pos'):
 
@@ -219,6 +289,7 @@ def main(task):
             neg_set = []
             counter = 0
             adj_to_list = list(adjlist)
+            # construct negative list
             while counter < to_process:
                 x = random.randrange(len(adj_to_list))
                 y = random.randrange(len(adj_to_list))
@@ -227,22 +298,21 @@ def main(task):
                     counter = counter + 1
                     tqdmbar.update(1)
             tqdmbar.close()
+            # extract features and save to disk
             with open(extracted_neg_path,'a') as f:
                 for n1,n2 in tqdm(neg_set):
                     # print(f"neg_counter{neg_counter} < to_process{to_process}:{(neg_counter < to_process)}")
                     ja,re = feature_extraction(network,(n1,n2))
                     f.write(f"{n1}|{n2} {ja} {re}\n")
 if __name__ == "__main__":
-     
+    persistent_network_path = "./data/persistent_network.pst"
+    extracted_node_path = "./data/extracted.ext"
+    feature_set_path = "./data/featureset.ext"
+    extracted_neg_path = "./data/extracted_neg.ext"
     for i in range(len(sys.argv)):
         if (sys.argv[i] == '-t'):
             task = sys.argv[i+1]
     if(task != "predict"):
-        persistent_network_path = "./data/persistent_network.pst"
-        extracted_node_path = "./data/extracted.ext"
-        feature_set_path = "./data/featureset.ext"
-        extracted_neg_path = "./data/extracted_neg.ext"
-
         # attempt to load from persistant dataset
         print("Loading train data...")
 
@@ -260,6 +330,6 @@ if __name__ == "__main__":
             print("Complete. Dumping object to disk...")
             with open(persistent_network_path, 'wb') as f:
                 pickle.dump((adjlist,network), f, pickle.HIGHEST_PROTOCOL)
-    manager = Manager()
-    q = Queue()
+    # manager = Manager()
+    # q = Queue()
     main(task)
