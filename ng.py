@@ -191,7 +191,14 @@ def processe_data_tensor_train(pos,neg):
 #                     extracted_node_file.flush()
 #                 feature_set_file.flush()
 
-
+def convert_lou_predict(path):
+    index = 1
+    with open(extracted_predict_path,'w') as o:
+        with open(path,'r') as f:
+            for line in f:
+                src,sink,ja,re = line.rstrip().split("\t")
+                o.write(f"{index} {src} {sink} {ja} {re}\n")
+                index = index + 1
 def main(task):
     if(task == 'train'):
         print("Loading negative instances")
@@ -228,20 +235,6 @@ def main(task):
         # serialize weights to HDF5
         model.save_weights("model.h5")
         print("Model saved")
-        # load json and create model
-        # json_file = open('model.json', 'r')
-        # loaded_model_json = json_file.read()
-        # json_file.close()
-        # loaded_model = model_from_json(loaded_model_json)
-        # # load weights into new model
-        # loaded_model.load_weights("model.h5")
-        # print("Loaded model from disk")
-        
-        # # evaluate loaded model on test data
-        # loaded_model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
-        # score = loaded_model.evaluate(X, Y, verbose=0)
-        # print("%s: %.2f%%" % (loaded_model.metrics_names[1], score[1]*100))
-
     elif(task == 'extract_pos'):
 
             print("Loading already extracted node features")
@@ -304,6 +297,36 @@ def main(task):
             for index,src,sink in tqdm(predict):
                 ja,re = feature_extraction(network,(src,sink))
                 f.write(f"{index} {src} {sink} {ja} {re}\n")
+    elif(task == 'predict'):
+        predict_data = []
+        with open(extracted_predict_path, 'r') as f:
+            for line in tqdm(f):
+                index,_,_,ja,re = line.rstrip().split(' ')
+                predict_data.append(np.array([ja,re]))
+        predict_data = np.array(predict_data)
+        # load json and create model
+
+        # save to disk, from https://machinelearningmastery.com/save-load-keras-deep-learning-models/
+        json_file = open('model.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        loaded_model = model_from_json(loaded_model_json)
+        # load weights into new model
+        loaded_model.load_weights("model.h5")
+        print("Loaded model from disk")
+        
+        # evaluate loaded model on test data
+        loaded_model.compile(loss='binary_crossentropy', optimizer='nadam', metrics=['accuracy'])
+        # score = loaded_model.evaluate(X, Y, verbose=0)
+        # print("%s: %.2f%%" % (loaded_model.metrics_names[1], score[1]*100))
+        # convert_lou_predict("predict_feature_vectors.txt")
+        predicts = loaded_model.predict(predict_data)
+        print("Predict complete, saving to disk")
+        with open(predict_output_path, 'w') as o:
+            o.write("Id,Prediction\n")
+            for i,e in enumerate(predicts):
+                o.write(f"{i+1},{e[0]}\n")
+
 
         
 if __name__ == "__main__":
@@ -312,10 +335,12 @@ if __name__ == "__main__":
     feature_set_path = "./data/featureset.ext"
     extracted_neg_path = "./data/extracted_neg.ext"
     extracted_predict_path = "./data/extracted_predict.ext"
+    predict_output_path = "./data/predict_output.ext"
     for i in range(len(sys.argv)):
         if (sys.argv[i] == '-t'):
             task = sys.argv[i+1]
-    if(task != "train" or task != "predict"):
+    
+    if(task != "train" and task != "predict"):
         # attempt to load from persistant dataset
         print("Loading train data...")
 
