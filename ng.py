@@ -1,14 +1,12 @@
 import numpy as np
 import math
 import networkx as nx
-import progressbar
 import os.path
 import time
 import pickle
 from multiprocessing import Pool, Array, Process, Queue, Manager
 from tqdm import tqdm
 from functools import partial 
-import myModule as mymodule
 import sys
 import random
 import tensorflow as tf
@@ -17,8 +15,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import model_from_json
 
 def load_predict_data(path, delimiter, with_index):
-    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
-    pb_i = 0
+    bar = tqdm()
     test = []
     test_dict = {}
     with open(path, "r") as f:
@@ -39,14 +36,13 @@ def load_predict_data(path, delimiter, with_index):
                 # construct (x, y) tuple
                 test.append((v1, v2))
             # progress bar update
-            pb_i = pb_i + 1
-            bar.update(pb_i)
+            bar.update(1)
         print('\n')
+    bar.close()
     return (test, test_dict)
 
 def load_train_data(path, delimiter):
-    bar = progressbar.ProgressBar(max_value=progressbar.UnknownLength)
-    pb_i = 0
+    bar = tqdm()
     train_pos = []
     test = {}
     adjlist = {}    # adjacency list
@@ -71,10 +67,9 @@ def load_train_data(path, delimiter):
                 # construct (x, y) tuple
                 train_pos.append((v1, v2))
             # progress bar update
-            pb_i = pb_i + 1
-            bar.update(pb_i)
+            bar.update(1)
         print('\n')
-
+    bar.close()
     return adjlist, network
 def load_exist_extracted(path, adjlist):
     feature_list = {}
@@ -204,7 +199,6 @@ def main(task):
         print("Loading positive instances")
         extracted_pos = load_extracted_pos(feature_set_path)
         print("Loading predict data...")
-        (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
         # processing data
         print("Processing data")
         data,labels = processe_data_tensor_train(extracted_pos,extracted_neg)
@@ -304,15 +298,24 @@ def main(task):
                     # print(f"neg_counter{neg_counter} < to_process{to_process}:{(neg_counter < to_process)}")
                     ja,re = feature_extraction(network,(n1,n2))
                     f.write(f"{n1}|{n2} {ja} {re}\n")
+    elif(task == 'extract_predict'):
+        (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+        with open(extracted_predict_path,'w') as f:
+            for index,src,sink in tqdm(predict):
+                ja,re = feature_extraction(network,(src,sink))
+                f.write(f"{index} {src} {sink} {ja} {re}\n")
+
+        
 if __name__ == "__main__":
     persistent_network_path = "./data/persistent_network.pst"
     extracted_node_path = "./data/extracted.ext"
     feature_set_path = "./data/featureset.ext"
     extracted_neg_path = "./data/extracted_neg.ext"
+    extracted_predict_path = "./data/extracted_predict.ext"
     for i in range(len(sys.argv)):
         if (sys.argv[i] == '-t'):
             task = sys.argv[i+1]
-    if(task != "train"):
+    if(task != "train" or task != "predict"):
         # attempt to load from persistant dataset
         print("Loading train data...")
 
