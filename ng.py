@@ -14,32 +14,23 @@ from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import model_from_json
 
-def load_predict_data(path, delimiter, with_index):
+def load_predict_data(path, delimiter):
     bar = tqdm()
     test = []
-    test_dict = {}
+    # test_dict = {}
     with open(path, "r") as f:
         for line in f:
             # split the line
             splited = line.rstrip().split(delimiter)
-            if (with_index):
-                v0 = int(splited[0])
-                v1 = int(splited[1])
-                v2 = int(splited[2])
-                # construct dictionary
-                test_dict[v0] = (v1, v2)
-                # construct (x, y) tuple
-                test.append((v1, v2))
-            else:
-                v1 = int(splited[0])
-                v2 = int(splited[1])
-                # construct (x, y) tuple
-                test.append((v1, v2))
+            v0 = int(splited[0])
+            v1 = int(splited[1])
+            v2 = int(splited[2])
+            test.append((v0,v1, v2))
             # progress bar update
             bar.update(1)
         print('\n')
     bar.close()
-    return (test, test_dict)
+    return test
 
 def load_train_data(path, delimiter):
     bar = tqdm()
@@ -79,36 +70,35 @@ def load_exist_extracted(path, adjlist):
                 numline = int(line.strip())
                 del adjlist[numline]
     return feature_list
-
-def feature_extraction(network,link):
+# ja,re,cn,aai,size_src,size_sink
+def feature_extraction(network,link,expend=False):
     feature = []
     (x, y) = link
-
-    # jaccard coefficient
-    (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
-
-    # resource allocation index
-    (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
-    
-    return jaccard_coefficient,resource_allocation_index
-
-def process_pos(network, base_node, connected_node, tqdmbar=True):
+    common_neighbors = len(list(nx.common_neighbors(network, x, y)))
+    (_, _, adamic_adar_index) = list(nx.adamic_adar_index(network, [(x, y)]))[0]
+    if(expend == False):
+        # jaccard coefficient
+        (_, _, jaccard_coefficient) = list(nx.jaccard_coefficient(network, [(x, y)]))[0]
+        # resource allocation index
+        (_, _, resource_allocation_index) = list(nx.resource_allocation_index(network, [(x, y)]))[0]
+        return jaccard_coefficient,resource_allocation_index,common_neighbors,adamic_adar_index,len(adjlist[x]),len(adjlist[y])
+    else:
+        return common_neighbors,adamic_adar_index,len(adjlist[x]),len(adjlist[y])
+def process_pos(network, base_node, connected_node):
     feature_set = []
     # print(f"-----------------------------------------------\nbase: {base_node}, edges:{connceted_node}")
-    if(tqdmbar):
-        for e in tqdm(connected_node):
-            ja,re = feature_extraction(network,(base_node,e))
-            feature_set.append((e,ja,re))
-    else:
-        for e in connected_node:
-            ja,re = feature_extraction(network,(base_node,e))
-            feature_set.append((e,ja,re))
+
+    for e in tqdm(connected_node):
+        ja,re,cn,aai,size_src,size_sink = feature_extraction(network,(base_node,e))
+        feature_set.append((e,ja,re,cn,aai,size_src,size_sink))
+
     # mymodule.q.put(feature_set)
     return feature_set
 def reshape_adj(adjlist, size=-1, max_adjlist_size=2000):
     adj = []
     counter = 0
-    for e in adjlist:
+    adjlist_sample = adjlist if size < 0 else random.sample(list(adjlist),size)
+    for e in adjlist_sample:
         base,connected = e
         if(len(connected)>max_adjlist_size):
             connected = connected[:int(max_adjlist_size/len(connected)*max_adjlist_size) + 1]
@@ -139,23 +129,40 @@ def file_lines_count(path):
             counter = counter + 1
 
     return counter
-def load_extracted_pos(path):
+# def load_extracted_pos(path):
+#     extracted_pos = []
+#     if(os.path.exists(path)):
+#         with open(path,'r') as f:
+#             for line in f:
+#                 s = line.rstrip().split(" ")
+#                 extracted_pos.append((int(s[0]),int(s[1]),s[2],s[3]))
+#     return extracted_pos
+def load_extracted_pos_v2(path):
     extracted_pos = []
     if(os.path.exists(path)):
         with open(path,'r') as f:
             for line in f:
                 s = line.rstrip().split(" ")
-                extracted_pos.append((s[0],s[1],s[2],s[3]))
+                extracted_pos.append((int(s[0]),int(s[1]),float(s[2]),float(s[3]),float(s[4]),float(s[5]),int(s[6]),int(s[7])))
     return extracted_pos
+# def load_extracted_neg(path):
+#     extracted_ng = {}
+#     if(os.path.exists(path)):
+            
+#         with open(path,'r') as f:
+#             for line in f:
+#                 s = line.rstrip().split(' ')
+#                 extracted_ng[s[0]]=(float(s[1]),float(s[2]))
+#     return extracted_ng
 # extracted neg - formet bas_enode|disconnected_node ja re
-def load_extracted_neg(path):
+def load_extracted_neg_v2(path):
     extracted_ng = {}
     if(os.path.exists(path)):
             
         with open(path,'r') as f:
             for line in f:
                 s = line.rstrip().split(' ')
-                extracted_ng[s[0]]=(s[1],s[2])
+                extracted_ng[s[0]]=(float(s[1]),float(s[2]),float(s[3]),float(s[4]),int(s[5]),int(s[6]))
     return extracted_ng
 # def initProcess(q):
 # #   mymodule.network = share
@@ -166,11 +173,12 @@ def processe_data_tensor_train(pos,neg):
     labels = []
     for x in tqdm(range(len(pos))):
         # print(f"pos:{pos[x]}, neg:{neg[x]}")
-        _,_,ja_p,re_p = pos[x]
-        ja_n,re_n = neg[x]
-        data.append(np.array([ja_p,re_p]))
+        _,_,ja_p,re_p,cn_p,aai_p,size_src_p,size_sink_p = pos[x]
+        ja_n,re_n,cn_n,aai_n,size_src_n,size_sink_n = neg[x]
+
+        data.append(np.array([ja_p,re_p,cn_p,aai_p,size_src_p,size_sink_p ]))
         labels.append(True)
-        data.append(np.array([ja_n,re_n]))
+        data.append(np.array([ja_n,re_n,cn_n,aai_n,size_src_n,size_sink_n ]))
         labels.append(False)
     return np.array(data),np.array(labels)
 
@@ -202,9 +210,9 @@ def convert_lou_predict(path):
 def main(task):
     if(task == 'train'):
         print("Loading negative instances")
-        extracted_neg = list(load_extracted_neg(extracted_neg_path).values())
+        extracted_neg = list(load_extracted_neg_v2(extracted_neg_v2_path).values())
         print("Loading positive instances")
-        extracted_pos = load_extracted_pos(feature_set_path)
+        extracted_pos = load_extracted_pos_v2(extracted_pos_v2_path)
         print("Loading predict data...")
         # processing data
         print("Processing data")
@@ -255,18 +263,18 @@ def main(task):
             # print("process complete.")
 
             with open(extracted_node_path,'a') as extracted_node_file:
-                with open(feature_set_path, 'a') as feature_set_file:
+                with open(extracted_pos_v2_path, 'a') as feature_set_file:
                     for base_node,connected_node in tqdm(reshaped):
                         # extract feature
-                        for e,ja,re in process_pos(network,base_node, connected_node):
-                            feature_set_file.write(f"{base_node} {e} {ja} {re}\n")
+                        for e,ja,re,cn,aai,size_src,size_sink  in process_pos(network,base_node, connected_node):
+                            feature_set_file.write(f"{base_node} {e} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
                         feature_set_file.flush()
                         extracted_node_file.write(f"{base_node}\n")
                         extracted_node_file.flush()
     elif(task == 'extract_neg'):
         # count extracted
-        count = file_lines_count(feature_set_path)
-        extracted_neg = load_extracted_neg(extracted_neg_path)
+        count = file_lines_count(extracted_pos_v2_path)
+        extracted_neg = load_extracted_neg_v2(extracted_neg_v2_path)
         # do nothing if have already enough negs
         if(len(extracted_neg) < count):
             to_process = count - len(extracted_neg)
@@ -286,17 +294,17 @@ def main(task):
                     tqdmbar.update(1)
             tqdmbar.close()
             # extract features and save to disk
-            with open(extracted_neg_path,'a') as f:
+            with open(extracted_neg_v2_path,'a') as f:
                 for n1,n2 in tqdm(neg_set):
                     # print(f"neg_counter{neg_counter} < to_process{to_process}:{(neg_counter < to_process)}")
-                    ja,re = feature_extraction(network,(n1,n2))
-                    f.write(f"{n1}|{n2} {ja} {re}\n")
+                    ja,re,cn,aai,size_src,size_sink = feature_extraction(network,(n1,n2))
+                    f.write(f"{n1}|{n2} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
     elif(task == 'extract_predict'):
-        (predict, predict_dict) = load_predict_data("data/twitter_test.txt", delimiter='\t', with_index=True)
+        predict = load_predict_data("data/twitter_test.txt", delimiter='\t')
         with open(extracted_predict_path,'w') as f:
             for index,src,sink in tqdm(predict):
-                ja,re = feature_extraction(network,(src,sink))
-                f.write(f"{index} {src} {sink} {ja} {re}\n")
+                ja,re,cn,aai,size_src,size_sink = feature_extraction(network,(src,sink))
+                f.write(f"{index} {src} {sink} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
     elif(task == 'predict'):
         predict_data = []
         with open(extracted_predict_path, 'r') as f:
@@ -326,14 +334,30 @@ def main(task):
             o.write("Id,Prediction\n")
             for i,e in enumerate(predicts):
                 o.write(f"{i+1},{e[0]}\n")
+    # elif(task == 'expand'):
+    #     print("Expending positive feature sets")
+    #     with open(extracted_pos_v2_path,'w') as o:
+    #         for src,sink,ja,re in tqdm(load_extracted_pos(feature_set_path)):
+    #             # print(f"{src} {sink} {ja} {re}")
+    #             cn,aai,size_src,size_sink = feature_extraction(network,(src,sink),expend=True)
+    #             o.write(f"{src} {sink} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
+    #     print("Expending negative feature sets")
+
+    #     with open(extracted_neg_v2_path,'w') as o:
+    #         for src_sink,ja,re in tqdm(load_extracted_neg(extracted_neg_path)):
+    #             src,sink=src_sink.split("|")
+    #             cn,aai,size_src,size_sink = feature_extraction(network,(src,sink),expend=True)
+    #             o.write(f"{src} {sink} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
 
 
         
 if __name__ == "__main__":
     persistent_network_path = "./data/persistent_network.pst"
     extracted_node_path = "./data/extracted.ext"
-    feature_set_path = "./data/featureset.ext"
-    extracted_neg_path = "./data/extracted_neg.ext"
+    # feature_set_path = "./data/featureset.ext"
+    extracted_pos_v2_path = "./data/extracted_pos_v2.ext"
+    # extracted_neg_path = "./data/extracted_neg.ext"
+    extracted_neg_v2_path = "./data/extracted_neg_v2.ext"
     extracted_predict_path = "./data/extracted_predict.ext"
     predict_output_path = "./data/predict_output.ext"
     for i in range(len(sys.argv)):
