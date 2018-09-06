@@ -13,6 +13,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import model_from_json
+import copy
 
 def load_predict_data(path, delimiter):
     bar = tqdm()
@@ -68,7 +69,7 @@ def load_exist_extracted(path, adjlist):
         with open(path, "r") as f:
             for line in f:
                 numline = int(line.strip())
-                del adjlist[numline]
+                # del adjlist[numline]
     return feature_list
 # ja,re,cn,aai,size_src,size_sink
 def feature_extraction(network,link,expend=False):
@@ -94,9 +95,14 @@ def process_pos(network, base_node, connected_node):
 
     # mymodule.q.put(feature_set)
     return feature_set
-def reshape_adj(adjlist, size=-1, max_adjlist_size=2000):
+def reshape_adj(adjlist, extracted_node_list,size=-1, max_adjlist_size=2000):
     adj = []
     counter = 0
+    adj_collision_holder = {}
+    # temperarily cutout already extracted elements in extracted nodes
+    for e in extracted_node_list:
+        adj_collision_holder[e] = adjlist[e]
+        del adjlist[e]
     adjlist_sample = adjlist if size < 0 else random.sample(list(adjlist),size)
     for e in adjlist_sample:
         base,connected = e
@@ -106,6 +112,10 @@ def reshape_adj(adjlist, size=-1, max_adjlist_size=2000):
         counter = counter + 1
         if(counter == size):
             break
+    # push elements back into adjlist 
+    for e in adj_collision_holder:
+        adjlist[e] = adj_collision_holder[e]
+    adj_collision_holder = None
     return adj
 
 # shape adj list into blocks list
@@ -176,9 +186,9 @@ def processe_data_tensor_train(pos,neg):
         _,_,ja_p,re_p,cn_p,aai_p,size_src_p,size_sink_p = pos[x]
         ja_n,re_n,cn_n,aai_n,size_src_n,size_sink_n = neg[x]
 
-        data.append(np.array([ja_p,re_p,cn_p,aai_p,size_src_p,size_sink_p ]))
+        data.append(np.array([re_p]))
         labels.append(True)
-        data.append(np.array([ja_n,re_n,cn_n,aai_n,size_src_n,size_sink_n ]))
+        data.append(np.array([re_n]))
         labels.append(False)
     return np.array(data),np.array(labels)
 
@@ -207,6 +217,22 @@ def convert_lou_predict(path):
                 src,sink,ja,re = line.rstrip().split("\t")
                 o.write(f"{index} {src} {sink} {ja} {re}\n")
                 index = index + 1
+def sample_neg(to_process, extract_neg):
+    tqdmbar = tqdm(total=to_process)
+    print("Sampling negative set")
+    neg_set = []
+    counter = 0
+    adj_to_list = list(adjlist)
+    # construct negative list
+    while counter < to_process:
+        x = random.randrange(len(adj_to_list))
+        y = random.randrange(len(adj_to_list))
+        if (x!=y and f"{adj_to_list[x]}|{adj_to_list[y]}" not in extracted_neg):
+            neg_set.append((adj_to_list[x],adj_to_list[y]))
+            counter = counter + 1
+            tqdmbar.update(1)
+    tqdmbar.close()
+    return neg_set
 def main(task):
     if(task == 'train'):
         print("Loading negative instances")
@@ -222,7 +248,7 @@ def main(task):
         print("Building model")
         model = keras.Sequential()
         # Adds a densely-connected layer with 64 units to the model:
-        model.add(keras.layers.Dense(64, activation='relu', input_dim=2))
+        model.add(keras.layers.Dense(64, activation='relu', input_dim=1))
         # Add another:
         model.add(keras.layers.Dense(64, activation='relu'))
         # Add a softmax layer with 10 output units:
@@ -232,7 +258,8 @@ def main(task):
               loss='binary_crossentropy',
               metrics=['accuracy'])
 
-        model.fit(data, labels, epochs=20)
+        model.fit(data, labels, epochs=500, batch_size=50000)
+        
         # save to disk, from https://machinelearningmastery.com/save-load-keras-deep-learning-models/
         scores = model.evaluate(data, labels, verbose=0)
         print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
@@ -256,7 +283,8 @@ def main(task):
             # pool = Pool(processes=4)
             # # print("Processing positive datas")
             # # partial_pos = partial(process_pos, network)
-            reshaped = reshape_adj(adjlist.items(),size=300000)
+            print("Sampling nodes")
+            reshaped = reshape_adj(adjlist.items(),existing_feature_list,size=300000)
             # reshaped = reshap_adj_to_block(reshaped,1)
             # for _ in tqdm(pool.imap(block_pos_processing, reshaped), total=len(reshaped)):
             #     pass
@@ -278,24 +306,11 @@ def main(task):
         # do nothing if have already enough negs
         if(len(extracted_neg) < count):
             to_process = count - len(extracted_neg)
-            tqdmbar = tqdm(total=to_process)
-            # neg_counter = 0
-            print("Sampling negative set")
-            neg_set = []
-            counter = 0
-            adj_to_list = list(adjlist)
-            # construct negative list
-            while counter < to_process:
-                x = random.randrange(len(adj_to_list))
-                y = random.randrange(len(adj_to_list))
-                if (x!=y and f"{adj_to_list[x]}|{adj_to_list[y]}" not in extracted_neg):
-                    neg_set.append((adj_to_list[x],adj_to_list[y]))
-                    counter = counter + 1
-                    tqdmbar.update(1)
-            tqdmbar.close()
+            
+
             # extract features and save to disk
             with open(extracted_neg_v2_path,'a') as f:
-                for n1,n2 in tqdm(neg_set):
+                for n1,n2 in tqdm(sample_neg(to_process,extracted_neg)):
                     # print(f"neg_counter{neg_counter} < to_process{to_process}:{(neg_counter < to_process)}")
                     ja,re,cn,aai,size_src,size_sink = feature_extraction(network,(n1,n2))
                     f.write(f"{n1}|{n2} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
@@ -305,12 +320,20 @@ def main(task):
             for index,src,sink in tqdm(predict):
                 ja,re,cn,aai,size_src,size_sink = feature_extraction(network,(src,sink))
                 f.write(f"{index} {src} {sink} {ja} {re} {cn} {aai} {size_src} {size_sink}\n")
+    elif(task == 'edgelist'):
+        nx.write_edgelist(network,extracted_edgelist_path)
+        # neg_set = sample_neg(len(network.edges()),[])
+        # with open(extracted_edgelist_path) as edge_file:
+        #     with open(extracted_edgelist_label_path) as label_file:
+        #         for (pos_src,pos_sink),(neg_src,neg_sink) in zip(network.edges(),neg_set):
+        #             edge_file.write(f"{pos_src} {pos_sink}\n")
+
     elif(task == 'predict'):
         predict_data = []
         with open(extracted_predict_path, 'r') as f:
             for line in tqdm(f):
-                index,_,_,ja,re = line.rstrip().split(' ')
-                predict_data.append(np.array([ja,re]))
+                index,_,_,ja,re,cn,aai,size_src,size_sink= line.rstrip().split(' ')
+                predict_data.append(np.array([re]))
         predict_data = np.array(predict_data)
         # load json and create model
 
@@ -359,6 +382,8 @@ if __name__ == "__main__":
     # extracted_neg_path = "./data/extracted_neg.ext"
     extracted_neg_v2_path = "./data/extracted_neg_v2.ext"
     extracted_predict_path = "./data/extracted_predict.ext"
+    extracted_edgelist_path = "./data/edgelist.ext"
+    extracted_edgelist_label_path = "./data/edgelist_label.ext"
     predict_output_path = "./data/predict_output.ext"
     for i in range(len(sys.argv)):
         if (sys.argv[i] == '-t'):
@@ -379,6 +404,7 @@ if __name__ == "__main__":
             # falling back to normal dataset
             print("Persistant traning network not found, loading from dataset")
             adjlist,network = load_train_data(path="data/train.txt", delimiter='\t')
+            
             print("Complete. Dumping object to disk...")
             with open(persistent_network_path, 'wb') as f:
                 pickle.dump((adjlist,network), f, pickle.HIGHEST_PROTOCOL)
