@@ -4,16 +4,13 @@ import networkx as nx
 import os.path
 import time
 import pickle
-from multiprocessing import Pool, Array, Process, Queue, Manager
 from tqdm import tqdm
-from functools import partial 
 import sys
 import random
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import model_from_json
-import copy
 
 def load_predict_data(path, delimiter):
     bar = tqdm()
