@@ -20,12 +20,15 @@ python ng.py -t extract predict
 
 data will be stored in /data
 
-Then, train the model
+Then, train the model and predict
 
 python ng.py -t train
 will train and save a tensorflow model
 python ng.py -t predict
 will load the model and predict results
+
+
+Extra stuff:
 
 python ng.py -t edgelist
 will convert train data into edgelist
