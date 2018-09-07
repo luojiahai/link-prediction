@@ -186,9 +186,9 @@ def processe_data_tensor_train(pos,neg):
         _,_,ja_p,re_p,cn_p,aai_p,size_src_p,size_sink_p = pos[x]
         ja_n,re_n,cn_n,aai_n,size_src_n,size_sink_n = neg[x]
 
-        data.append(np.array([re_p]))
+        data.append(np.array([ja_p,re_p]))
         labels.append(True)
-        data.append(np.array([re_n]))
+        data.append(np.array([ja_n,re_n]))
         labels.append(False)
     return np.array(data),np.array(labels)
 
@@ -227,7 +227,7 @@ def sample_neg(to_process, extract_neg):
     while counter < to_process:
         x = random.randrange(len(adj_to_list))
         y = random.randrange(len(adj_to_list))
-        if (x!=y and f"{adj_to_list[x]}|{adj_to_list[y]}" not in extracted_neg):
+        if (x!=y and f"{adj_to_list[x]}|{adj_to_list[y]}" not in extract_neg):
             neg_set.append((adj_to_list[x],adj_to_list[y]))
             counter = counter + 1
             tqdmbar.update(1)
@@ -248,7 +248,7 @@ def main(task):
         print("Building model")
         model = keras.Sequential()
         # Adds a densely-connected layer with 64 units to the model:
-        model.add(keras.layers.Dense(64, activation='relu', input_dim=1))
+        model.add(keras.layers.Dense(64, activation='relu', input_dim=2))
         # Add another:
         model.add(keras.layers.Dense(64, activation='relu'))
         # Add a softmax layer with 10 output units:
